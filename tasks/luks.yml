@@ -1,0 +1,115 @@
+---
+- name: Change disks partition table format and format with ext4
+  parted:
+    device: "{{ disks.disk_name }}"
+    label: gpt
+    number: 1
+    state: present
+    fs_type: ext4
+    flags: [ lvm ]
+  no_log: false
+  with_items: "{{ spec }}" 
+  loop_control:
+    loop_var: disks
+
+- name: Create volume groups 
+  lvg:
+    vg: "{{ disks.vg_name }}"
+    pvs: "{{ disks.vg_path }}"
+  no_log: false
+  with_items: "{{ spec }}" 
+  loop_control:
+    loop_var: disks
+
+- name: Create vault directory
+  file:
+    state: directory
+    path: "{{ disks.keys_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  no_log: false
+  with_items: "{{ spec }}"
+  loop_control:
+    loop_var: disks
+
+- name: Check vault key directory
+  stat:
+    path: "{{ disks.0.keys_path }}"
+  register: is_vault_key_files_exist
+  no_log: false
+  with_subelements: 
+    - "{{ spec }}"
+    - lv_specifications  
+  loop_control:
+    loop_var: disks
+
+- name: Check vault key file creation
+  command: sh -c "dd if=/dev/urandom of={{ disks.0.keys_path }}/{{ disks.1.lv_name }} bs=1024 count=4"
+  args:
+    chdir: "{{ disks.0.keys_path }}"
+    creates: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+  no_log: false
+  with_subelements: 
+    - "{{ spec }}"
+    - lv_specifications  
+  loop_control:
+    loop_var: disks
+
+- name: Check vault key file permissions
+  file:
+    state: file
+    path: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+    owner: root
+    group: root
+    mode: "0500"
+  no_log: false
+  with_subelements: 
+    - "{{ spec }}"
+    - lv_specifications  
+  loop_control:
+    loop_var: disks
+
+# - name: Move vault key files to Keymanager server # noqa command-instead-of-module
+#   command: "rsync -avz -e 'ssh' -e 'ssh -o StrictHostKeyChecking=no' -i {{ storage_info.key_storage.remote_key }} -R {{ storage_info.keys_path }} {{ storage_info.key_storage.remote_user }}@{{ storage_info.key_storage.remote_host }}:{{ storage_info.key_storage.remote_path }}"
+#   with_items: "{{ spec }}"
+#   no_log: false
+#   loop_control:
+#     loop_var: storage_info
+  # when: remote_storage is yes
+
+- name: Create all logical volumes with volume.yml. Variables included in defaults directory. Used include task because it works dynamic and sequential.
+  include_tasks: lv_creation.yml
+  no_log: false
+  with_subelements: 
+    - "{{ spec }}"
+    - lv_specifications  
+  loop_control:
+    loop_var: disks
+
+# - name: Run dracut for new boot image
+#   shell: |
+#     dracut -f
+#   register: output
+#   changed_when: output.rc != 0
+#   when: hw_generation == 2
+
+# - name: Create crypttab entry
+#   crypttab:
+#     backing_device: "{{ item.vg_path }}/{{ item.lv_name }}"
+#     name: "{{ item.lv_name }}"
+#     state: present
+#     password: "/vault/{{ ansible_hostname }}/secrets/crypt-{{ item.lv_name }}"
+#   with_items: "{{ luks_disks }}"
+
+# - name: Mount all to directories.
+#   include_tasks: mount.yml
+#   with_items: "{{ luks_disks }}"
+
+# - name: Reboot # noqa ignore-errors
+#   reboot:
+#     connect_timeout: 30
+#     reboot_timeout: 180
+#   failed_when: false
+#   ignore_errors: true
+#   ignore_unreachable: true

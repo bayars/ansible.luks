@@ -1,0 +1,50 @@
+- hosts: all
+  become: yes
+  tasks:
+
+    # - name: set facts for clevis
+    #   set_fact:
+    #     local_storage: yes
+        # lvm_packages:
+        #   - initramfs-tools 
+        #   - lvm2
+        # lvm_install: True
+        # clevis_install: False
+        # clevis: false
+        # clevis_packages:
+        #   - clevis
+        #   - clevis-tpm2
+        #   - clevis-systemd
+        #   - clevis-luks
+        #   - clevis-dracut
+        #   - clevis-udisks2
+  
+    - name: import tasks
+      include_tasks: "{{ item }}"
+      with_fileglob:
+        - tasks/*.yml
+      no_log: false
+      vars: 
+        spec: 
+        - disk_name: '/dev/sda'
+          pv_number: '1'
+          vg_name: 'ROOT'
+          vg_path: '/dev/sda1'
+          keys_path: "/vault/{{ ansible_hostname }}/secrets"
+          lv_specifications:
+            - lv_name: "root"
+              mount_point: "/root"
+              size: "5G"
+              vg_group: "ROOT"
+            - lv_name: "BACKUP"
+              mount_point: "/mnt"
+              size: "100G"
+              vg_group: "ROOT"
+          key_storage:
+            remote_storage: "true"
+            remote_host: "192.168.1.1"
+            remote_user: "root"
+            remote_path: "/vault/{{ ansible_hostname }}/secrets"
+            remote_port: "22"
+            remote_key: "/vault/{{ ansible_hostname }}/secrets/ansible_rsa"
+

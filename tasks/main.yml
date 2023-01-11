@@ -1,0 +1,30 @@
+---
+# - name: Check if vault keys exists
+#   become: yes
+#   stat:
+#     path: /root/vault
+#   register: isVaultExists
+# - name: Update and upgrade apt packages
+#   apt:
+#     upgrade: yes
+#     update_cache: yes
+
+# - name: Install clevis packages if clevis encryption requested
+#   apt:
+#     package: "{{ lvm_packages }}"
+#     state: present
+#   when: lvm_install is true
+
+# - name: Install clevis packages if clevis encryption requested
+#   apt:
+#     package: "{{ clevis_packages }}"
+#     state: present
+#   when: clevis is true
+
+
+
+- name: hw_generation 1 luks role
+  become: yes
+  ansible.builtin.import_tasks: luks.yml
+  no_log: "{{ hide_logs }}"
+  # when: lvm_install is True

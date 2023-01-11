@@ -1,0 +1,51 @@
+---
+- hosts: localhost
+  tasks:
+    - name: create dictionary
+      set_fact:
+        spec: 
+        - disk_name: '/dev/sda'
+          pv_number: '1'
+          vg_name: 'ROOT'
+          vg_path: '/dev/sda1'
+          keys_path: "/vault/{{ ansible_hostname }}/secrets"
+          lv_specifications:
+            - lv_name: "root"
+              mount_point: "/root"
+              size: "5G"
+              vg_group: "ROOT"
+            - lv_name: "BACKUP"
+              mount_point: "/mnt"
+              size: "100G"
+              vg_group: "ROOT"
+          key_storage:
+            remote_storage: "true"
+            remote_host: "192.168.1.1"
+            remote_user: "root"
+            remote_path: "/vault/{{ ansible_hostname }}/secrets"
+            remote_port: "22"
+            remote_key: "/vault/{{ ansible_hostname }}/secrets/ansible_rsa"
+
+    - name: debug dictionary
+      debug:
+        msg: "{{ storage_info.key_storage.remote_key }} -R {{ storage_info.keys_path }} {{ storage_info.key_storage.remote_user }}@{{ storage_info.key_storage.remote_host }}:{{ storage_info.keys_path }}"
+      no_log: false
+      with_items: "{{ spec }}"
+      loop_control:
+        loop_var: storage_info
+
+
+
+  # vars:
+  #   users:
+  #     alice:
+  #       name: Alice Appleworth
+  #       telephone: 123-456-7890
+  #     bob:
+  #       name: Bob Bananarama
+  #       telephone: 987-654-3210
+  # tasks:
+  #   - name: Print phone records
+  #     debug:
+  #       msg: "User {{ item.key }} is {{ item.value.name }} ({{ item.value.telephone }})"
+  #     loop: "{{ lookup('dict', users) }}"

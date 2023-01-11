@@ -1,0 +1,28 @@
+---
+- name: Create logical volume
+  lvol:
+    vg: "{{ disks.1.vg_group }}"
+    lv: "{{ disks.1.lv_name }}"
+    size: "{{ disks.1.size }}"
+    shrink: no
+  no_log: false
+
+
+- name: Create LUKS disk
+  luks_device:
+    device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+    state: present
+    type: luks2
+    keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+    pbkdf:
+      algorithm: pbkdf2
+      memory: 256
+  no_log: false
+
+# - name: run clevis for encryption
+#   shell: |
+#     clevis luks bind -y -k /vault/{{ ansible_hostname }}/secrets/crypt-{{ item.lv_name }} -d {{ item.vg_path }}/{{ item.lv_name }} tpm2 '{"pcr_bank":"sha256","pcr_ids":"1,7"}'
+#   register: output
+#   changed_when: output.rc != 0
+#   no_log: false
+#   when: clevis is yes
