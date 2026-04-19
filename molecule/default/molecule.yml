@@ -7,9 +7,6 @@ dependency:
 driver:
   name: docker
 
-# MOLECULE_DISTRO is set by the CI matrix. Locally it defaults to ubuntu2204.
-# Privileged mode + /dev bind-mount gives the container access to loop
-# devices so cryptsetup / LVM can run real operations.
 platforms:
   - name: "luks-test-${MOLECULE_DISTRO:-ubuntu2204}"
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2204}-ansible:latest"
@@ -37,6 +34,22 @@ provisioner:
     group_vars:
       all:
         ansible_python_interpreter: /usr/bin/python3
+
+# Explicit test sequence — includes the built-in idempotency step which
+# runs converge a second time and fails if any task reports 'changed'.
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotency
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

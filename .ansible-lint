@@ -9,7 +9,7 @@ exclude_paths:
 skip_list:
   # dd for key generation — intentional, no module equivalent
   - command-instead-of-module
-  # rsync task explicitly sets changed_when: true
+  # rsync and cryptsetup commands explicitly set changed_when
   - no-changed-when[cmd]
 
 warn_list:
@@ -23,5 +23,11 @@ mock_modules:
   - community.general.lvol
   - community.general.filesystem
   - community.general.crypttab
+  - community.general.apk
+  - community.general.modprobe
   - community.crypto.luks_device
+  - community.crypto.openssh_keypair
+  - community.hashi_vault.vault_kv2_write
+  - community.hashi_vault.vault_kv2_get
   - ansible.posix.mount
+  - ansible.posix.authorized_key

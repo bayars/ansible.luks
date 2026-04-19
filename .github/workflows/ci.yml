@@ -34,20 +34,14 @@ jobs:
         run: ansible-galaxy collection install -r requirements.yml
 
       - name: Syntax check — encrypt playbook
-        run: >
-          ansible-playbook playbooks/encrypt.yml
-          -i tests/inventory --syntax-check
+        run: ansible-playbook playbooks/encrypt.yml -i tests/inventory --syntax-check
 
       - name: Syntax check — decrypt playbook
-        run: >
-          ansible-playbook playbooks/decrypt.yml
-          -i tests/inventory --syntax-check
+        run: ansible-playbook playbooks/decrypt.yml -i tests/inventory --syntax-check
 
-  # ── Molecule integration tests ─────────────────────────────────────────────
-  # Uses privileged Docker containers with a loop device to run actual LUKS
-  # operations (parted → lvg → cryptsetup → mount) without a bare-metal host.
-  molecule:
-    name: Molecule (${{ matrix.distro }})
+  # ── Molecule: default scenario (encrypt + idempotency) ────────────────────
+  molecule-default:
+    name: Molecule default (${{ matrix.distro }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -78,9 +72,58 @@ jobs:
       - name: Install collection dependencies
         run: ansible-galaxy collection install -r requirements.yml
 
-      - name: Run Molecule tests
+      - name: Run Molecule — default scenario
         run: molecule test --scenario-name default
-        working-directory: ${{ github.workspace }}
+
+  # ── Molecule: key rotation scenario ───────────────────────────────────────
+  molecule-rotate:
+    name: Molecule rotate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Molecule and dependencies
+        run: >
+          pip install
+          "ansible-core>=2.14"
+          molecule
+          "molecule-plugins[docker]"
+
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Run Molecule — rotate scenario
+        run: molecule test --scenario-name rotate
+
+  # ── Molecule: remote_filesystem key sync scenario ─────────────────────────
+  molecule-remote-filesystem:
+    name: Molecule remote_filesystem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Molecule and dependencies
+        run: >
+          pip install
+          "ansible-core>=2.14"
+          molecule
+          "molecule-plugins[docker]"
+
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Run Molecule — remote_filesystem scenario
+        run: molecule test --scenario-name remote_filesystem
 
   # ── Build collection tarball ───────────────────────────────────────────────
   build:

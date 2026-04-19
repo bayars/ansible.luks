@@ -1,4 +1,4 @@
-namespace: safabayar
+namespace: bayars
 name: luks
 version: 1.0.0
 readme: README.md
@@ -19,10 +19,10 @@ tags:
   - security
   - linux
   - cryptsetup
-repository: https://github.com/safabayar/ansible.luks
-documentation: https://github.com/safabayar/ansible.luks
-homepage: https://github.com/safabayar/ansible.luks
-issues: https://github.com/safabayar/ansible.luks/issues
+repository: https://github.com/bayars/ansible.luks
+documentation: https://github.com/bayars/ansible.luks
+homepage: https://github.com/bayars/ansible.luks
+issues: https://github.com/bayars/ansible.luks/issues
 build_ignore:
   - .github/
   - .yamllint.yml

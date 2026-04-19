@@ -1,9 +1,9 @@
-# safabayar.luks
+# bayars.luks
 
 Ansible collection that provisions and manages LUKS2-encrypted LVM logical volumes.
 
 **Supports:** Debian · Ubuntu · Rocky Linux · CentOS Stream · RHEL  
-**Galaxy:** `ansible-galaxy collection install safabayar.luks`
+**Galaxy:** `ansible-galaxy collection install bayars.luks`
 
 ---
 
@@ -124,7 +124,7 @@ Each `lv_specifications` entry:
         key_storage:
           type: filesystem
   roles:
-    - role: safabayar.luks
+    - role: bayars.luks
 ```
 
 To use remote key backup:
