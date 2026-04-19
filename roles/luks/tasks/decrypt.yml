@@ -1,9 +1,49 @@
 ---
 # Unlock and mount already-provisioned LUKS volumes.
-# Key files must be present at keys_path on the target host.
-# If key_storage.type == remote_filesystem, fetch keys first (see docs/key_storage.md).
+# Handles all key_storage backends: filesystem, remote_filesystem, tpm2, vault.
 
-- name: Open LUKS container luks-{{ disks.1.lv_name }}
+# ── Vault: retrieve key files before opening LUKS ─────────────────────────
+- name: Retrieve key from HashiCorp Vault ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+  when: disks.0.key_storage.type == 'vault'
+  block:
+    - name: Read key from Vault KV v2
+      community.hashi_vault.vault_kv2_get:
+        url: "{{ disks.0.key_storage.vault_url }}"
+        auth_method: "{{ disks.0.key_storage.vault_auth_method | default('token') }}"
+        token: "{{ disks.0.key_storage.vault_token | default(omit) }}"
+        mount_point: "{{ disks.0.key_storage.vault_mount | default('secret') }}"
+        path: "{{ disks.0.key_storage.vault_path }}/{{ disks.1.lv_name }}"
+      register: _vault_secret
+      no_log: "{{ hide_logs }}"
+
+    - name: Write key to temporary local file
+      ansible.builtin.copy:
+        content: "{{ _vault_secret.secret.key | b64decode }}"
+        dest: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+        owner: root
+        group: root
+        mode: "0400"
+      no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+# ── Open LUKS containers ──────────────────────────────────────────────────
+- name: Open LUKS container via Clevis (TPM2) — luks-{{ disks.1.lv_name }}
+  ansible.builtin.command: >
+    clevis luks unlock
+    -d /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+    -n luks-{{ disks.1.lv_name }}
+  changed_when: true
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.0.key_storage.type == 'tpm2'
+
+- name: Open LUKS container with keyfile — luks-{{ disks.1.lv_name }}
   community.crypto.luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: opened
@@ -14,8 +54,20 @@
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.0.key_storage.type != 'tpm2'
 
-- name: Ensure mount point exists for {{ disks.1.mount_point }}
+# ── Mount / activate volumes ──────────────────────────────────────────────
+- name: Enable swap on luks-{{ disks.1.lv_name }}
+  ansible.builtin.command: swapon /dev/mapper/luks-{{ disks.1.lv_name }}
+  changed_when: true
+  failed_when: false
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.1.fstype | default('ext4') == 'swap'
+
+- name: Ensure mount point exists — {{ disks.1.mount_point }}
   ansible.builtin.file:
     state: directory
     path: "{{ disks.1.mount_point }}"
@@ -26,14 +78,29 @@
   loop_control:
     loop_var: disks
     label: "{{ disks.1.mount_point }}"
+  when: disks.1.fstype | default('ext4') != 'swap'
 
 - name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
   ansible.posix.mount:
     path: "{{ disks.1.mount_point }}"
     src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
     fstype: "{{ disks.1.fstype | default('ext4') }}"
+    opts: "{{ disks.1.mount_opts | default('defaults') }}"
     state: mounted
   loop: "{{ spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.1.fstype | default('ext4') != 'swap'
+
+# ── Vault: clean up temporary key files ───────────────────────────────────
+- name: Remove temporary Vault key file — {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+  ansible.builtin.file:
+    path: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+    state: absent
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.0.key_storage.type == 'vault'

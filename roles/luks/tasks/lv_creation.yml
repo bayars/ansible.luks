@@ -17,9 +17,21 @@
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
     pbkdf:
       algorithm: argon2id
-      memory: 1048576
-      iteration_count: 4
+      memory: "{{ disks.1.pbkdf_memory | default(1048576) }}"
+      iteration_count: "{{ disks.1.pbkdf_iterations | default(4) }}"
   no_log: "{{ hide_logs }}"
+
+# Clevis TPM2: bind the container to the TPM after LUKS format.
+# Creates an additional key slot; the keyfile remains as backup.
+- name: Bind LUKS container to TPM2 via Clevis
+  ansible.builtin.command: >
+    clevis luks bind -y
+    -k {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+    -d /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+    tpm2 '{"pcr_bank":"{{ disks.0.key_storage.tpm2_pcr_bank | default(tpm2_pcr_bank) }}","pcr_ids":"{{ disks.0.key_storage.tpm2_pcr_ids | default(tpm2_pcr_ids) }}"}'
+  no_log: "{{ hide_logs }}"
+  changed_when: true
+  when: disks.0.key_storage.type == 'tpm2'
 
 - name: Open LUKS container luks-{{ disks.1.lv_name }}
   community.crypto.luks_device:
@@ -29,31 +41,68 @@
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
   no_log: "{{ hide_logs }}"
 
-- name: Create {{ disks.1.fstype | default('ext4') }} filesystem on luks-{{ disks.1.lv_name }}
-  community.general.filesystem:
-    fstype: "{{ disks.1.fstype | default('ext4') }}"
-    dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
-    force: false
+# ── Swap volume ────────────────────────────────────────────────────────────
+- name: Set up encrypted swap ({{ disks.1.lv_name }})
+  when: disks.1.fstype | default('ext4') == 'swap'
+  block:
+    - name: Create swap filesystem on luks-{{ disks.1.lv_name }}
+      community.general.filesystem:
+        fstype: swap
+        dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+        force: false
 
-- name: Create mount point {{ disks.1.mount_point }}
-  ansible.builtin.file:
-    state: directory
-    path: "{{ disks.1.mount_point }}"
-    owner: root
-    group: root
-    mode: "0755"
+    - name: Enable swap on luks-{{ disks.1.lv_name }}
+      ansible.builtin.command: swapon /dev/mapper/luks-{{ disks.1.lv_name }}
+      changed_when: true
+      failed_when: false
 
-- name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
-  ansible.posix.mount:
-    path: "{{ disks.1.mount_point }}"
-    src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
-    fstype: "{{ disks.1.fstype | default('ext4') }}"
-    state: mounted
+    - name: Add swap to fstab
+      ansible.posix.mount:
+        path: none
+        src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+        fstype: swap
+        opts: sw
+        state: present
 
-- name: Add crypttab entry for luks-{{ disks.1.lv_name }}
-  community.general.crypttab:
-    name: "luks-{{ disks.1.lv_name }}"
-    backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
-    password: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-    state: present
-  no_log: "{{ hide_logs }}"
+    - name: Add crypttab entry for swap luks-{{ disks.1.lv_name }}
+      community.general.crypttab:
+        name: "luks-{{ disks.1.lv_name }}"
+        backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+        password: "{{ 'none' if disks.0.key_storage.type == 'tpm2' else disks.0.keys_path + '/' + disks.1.lv_name }}"
+        opts: swap
+        state: present
+      no_log: "{{ hide_logs }}"
+
+# ── Standard filesystem volume (ext4, xfs, btrfs) ─────────────────────────
+- name: Set up encrypted filesystem ({{ disks.1.lv_name }})
+  when: disks.1.fstype | default('ext4') != 'swap'
+  block:
+    - name: Create {{ disks.1.fstype | default('ext4') }} filesystem on luks-{{ disks.1.lv_name }}
+      community.general.filesystem:
+        fstype: "{{ disks.1.fstype | default('ext4') }}"
+        dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+        force: false
+
+    - name: Create mount point {{ disks.1.mount_point }}
+      ansible.builtin.file:
+        state: directory
+        path: "{{ disks.1.mount_point }}"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
+      ansible.posix.mount:
+        path: "{{ disks.1.mount_point }}"
+        src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+        fstype: "{{ disks.1.fstype | default('ext4') }}"
+        opts: "{{ disks.1.mount_opts | default('defaults') }}"
+        state: mounted
+
+    - name: Add crypttab entry for luks-{{ disks.1.lv_name }}
+      community.general.crypttab:
+        name: "luks-{{ disks.1.lv_name }}"
+        backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+        password: "{{ 'none' if disks.0.key_storage.type == 'tpm2' else disks.0.keys_path + '/' + disks.1.lv_name }}"
+        state: present
+      no_log: "{{ hide_logs }}"

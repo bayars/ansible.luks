@@ -34,8 +34,12 @@
     loop_var: disk
     label: "{{ disk.vg_name }}"
 
-- name: Generate key files and provision LUKS volumes
-  ansible.builtin.include_tasks: key_storage/generate.yml
+# Dispatch to the correct key storage backend per disk/lv pair.
+# filesystem / remote_filesystem / tpm2 → generate.yml (keyfile on disk)
+# vault                                 → vault.yml     (keyfile + Vault KV write)
+- name: Generate / store key files
+  ansible.builtin.include_tasks: >-
+    key_storage/{{ 'vault.yml' if disks.0.key_storage.type == 'vault' else 'generate.yml' }}
   no_log: "{{ hide_logs }}"
   loop: "{{ spec | subelements('lv_specifications') }}"
   loop_control:

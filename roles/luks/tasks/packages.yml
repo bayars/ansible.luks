@@ -12,6 +12,13 @@
     state: present
   when: ansible_os_family == 'RedHat'
 
+- name: Install LVM and LUKS packages (Alpine Linux)
+  community.general.apk:
+    name: "{{ lvm_packages_alpine }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Alpine'
+
 - name: Install Clevis packages (Debian / Ubuntu)
   ansible.builtin.apt:
     name: "{{ clevis_packages_debian }}"
@@ -27,3 +34,11 @@
   when:
     - clevis_install | bool
     - ansible_os_family == 'RedHat'
+
+- name: Install Clevis packages (Alpine Linux)
+  community.general.apk:
+    name: "{{ clevis_packages_alpine }}"
+    state: present
+  when:
+    - clevis_install | bool
+    - ansible_os_family == 'Alpine'

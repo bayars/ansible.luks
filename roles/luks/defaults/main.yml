@@ -1,5 +1,5 @@
 ---
-# Action to perform: encrypt (provision) or decrypt (unlock and mount)
+# Action to perform: encrypt | decrypt | close | rotate
 luks_action: encrypt
 
 # Set true in production to suppress key paths from Ansible output
@@ -9,13 +9,16 @@ hide_logs: true
 lvm_install: true
 clevis_install: false
 
-# Debian / Ubuntu
+# ── Debian / Ubuntu ────────────────────────────────────────────────────────
 lvm_packages_debian:
   - lvm2
   - cryptsetup
   - cryptsetup-bin
   - initramfs-tools
   - rsync
+  - xfsprogs
+  - btrfs-progs
+  - e2fsprogs
 
 clevis_packages_debian:
   - clevis
@@ -25,12 +28,15 @@ clevis_packages_debian:
   - clevis-dracut
   - clevis-udisks2
 
-# RHEL / Rocky Linux / CentOS
+# ── RHEL / Rocky Linux / CentOS ───────────────────────────────────────────
 lvm_packages_redhat:
   - lvm2
   - cryptsetup
   - dracut
   - rsync
+  - xfsprogs
+  - btrfs-progs
+  - e2fsprogs
 
 clevis_packages_redhat:
   - clevis
@@ -38,3 +44,22 @@ clevis_packages_redhat:
   - clevis-systemd
   - clevis-luks
   - clevis-dracut
+
+# ── Alpine Linux ──────────────────────────────────────────────────────────
+lvm_packages_alpine:
+  - lvm2
+  - cryptsetup
+  - e2fsprogs
+  - btrfs-progs
+  - xfsprogs
+  - rsync
+  - util-linux
+  - eudev
+
+clevis_packages_alpine:
+  - clevis
+
+# ── TPM2 defaults (key_storage.type == tpm2) ─────────────────────────────
+tpm2_pcr_bank: "sha256"
+tpm2_pcr_ids: "1,7"
+tpm2_keep_keyfile: true   # keep keyfile as backup LUKS slot after Clevis bind

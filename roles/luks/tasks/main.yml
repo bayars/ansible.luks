@@ -10,3 +10,11 @@
 - name: Decrypt — unlock and mount LUKS volumes
   ansible.builtin.include_tasks: decrypt.yml
   when: luks_action == 'decrypt'
+
+- name: Close — unmount and close LUKS volumes
+  ansible.builtin.include_tasks: close.yml
+  when: luks_action == 'close'
+
+- name: Rotate — replace key files and re-slot LUKS containers
+  ansible.builtin.include_tasks: rotate.yml
+  when: luks_action == 'rotate'
