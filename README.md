@@ -124,7 +124,7 @@ Each `lv_specifications` entry:
         key_storage:
           type: filesystem
   roles:
-    - role: bayars.luks
+    - role: bayars.luks.luks
 ```
 
 To use remote key backup:

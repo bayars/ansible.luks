@@ -1,5 +1,5 @@
 ---
-# handlers file for bayars.luks
+# handlers file for bayars.luks.luks
 
 - name: Update initramfs (Debian/Ubuntu)
   ansible.builtin.command: update-initramfs -u -k all

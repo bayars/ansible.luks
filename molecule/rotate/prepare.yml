@@ -13,9 +13,13 @@
         update_cache: true
 
     - name: Load dm-crypt kernel module
-      community.general.modprobe:
-        name: dm_crypt
-        state: present
+      ansible.builtin.command: modprobe dm_crypt
+      register: _modprobe
+      changed_when: false
+      failed_when:
+        - _modprobe.rc != 0
+        - "'already in kernel' not in _modprobe.stderr"
+        - "'builtin' not in _modprobe.stderr"
 
     - name: Create sparse image file
       ansible.builtin.command:

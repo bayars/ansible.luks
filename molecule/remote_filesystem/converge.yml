@@ -40,4 +40,4 @@
           remote_key: "/root/.ssh/keymanager_sync"
 
   roles:
-    - role: bayars.luks
+    - role: bayars.luks.luks

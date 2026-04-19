@@ -35,7 +35,7 @@
   tasks:
     - name: Encrypt volumes
       ansible.builtin.include_role:
-        name: bayars.luks
+        name: bayars.luks.luks
       vars:
         luks_action: encrypt
 
@@ -46,7 +46,7 @@
 
     - name: Rotate keys
       ansible.builtin.include_role:
-        name: bayars.luks
+        name: bayars.luks.luks
       vars:
         luks_action: rotate
 

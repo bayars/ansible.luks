@@ -33,6 +33,10 @@ jobs:
       - name: Install collection dependencies
         run: ansible-galaxy collection install -r requirements.yml
 
+      # Install the collection itself from source so 'bayars.luks.luks' resolves
+      - name: Install collection from source
+        run: ansible-galaxy collection install . --force
+
       - name: Syntax check — encrypt playbook
         run: ansible-playbook playbooks/encrypt.yml -i tests/inventory --syntax-check
 
@@ -72,6 +76,11 @@ jobs:
       - name: Install collection dependencies
         run: ansible-galaxy collection install -r requirements.yml
 
+      # The molecule dependency step also does this, but installing here
+      # ensures the collection is present before Molecule's syntax step runs.
+      - name: Install collection from source
+        run: ansible-galaxy collection install . --force
+
       - name: Run Molecule — default scenario
         run: molecule test --scenario-name default
 
@@ -97,6 +106,9 @@ jobs:
       - name: Install collection dependencies
         run: ansible-galaxy collection install -r requirements.yml
 
+      - name: Install collection from source
+        run: ansible-galaxy collection install . --force
+
       - name: Run Molecule — rotate scenario
         run: molecule test --scenario-name rotate
 
@@ -121,6 +133,9 @@ jobs:
 
       - name: Install collection dependencies
         run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Install collection from source
+        run: ansible-galaxy collection install . --force
 
       - name: Run Molecule — remote_filesystem scenario
         run: molecule test --scenario-name remote_filesystem

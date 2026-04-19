@@ -36,4 +36,4 @@
           type: filesystem
 
   roles:
-    - role: bayars.luks
+    - role: bayars.luks.luks
