@@ -33,4 +33,4 @@
           remote_port: "22"
           remote_key: "/root/.ssh/key_manager_rsa"
   roles:
-    - role: safabayar.luks
+    - role: bayars.luks

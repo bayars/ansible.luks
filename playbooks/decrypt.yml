@@ -27,4 +27,4 @@
         key_storage:
           type: filesystem
   roles:
-    - role: safabayar.luks
+    - role: bayars.luks
