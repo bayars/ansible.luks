@@ -3,14 +3,14 @@
 luks_action: encrypt
 
 # Set true in production to suppress key paths from Ansible output
-hide_logs: true
+luks_hide_logs: true
 
 # Package installation flags
-lvm_install: true
-clevis_install: false
+luks_lvm_install: true
+luks_clevis_install: false
 
 # ── Debian / Ubuntu ────────────────────────────────────────────────────────
-lvm_packages_debian:
+luks_lvm_packages_debian:
   - lvm2
   - cryptsetup
   - cryptsetup-bin
@@ -20,7 +20,7 @@ lvm_packages_debian:
   - btrfs-progs
   - e2fsprogs
 
-clevis_packages_debian:
+luks_clevis_packages_debian:
   - clevis
   - clevis-tpm2
   - clevis-systemd
@@ -29,7 +29,7 @@ clevis_packages_debian:
   - clevis-udisks2
 
 # ── RHEL / Rocky Linux / CentOS ───────────────────────────────────────────
-lvm_packages_redhat:
+luks_lvm_packages_redhat:
   - lvm2
   - cryptsetup
   - dracut
@@ -38,7 +38,7 @@ lvm_packages_redhat:
   - btrfs-progs
   - e2fsprogs
 
-clevis_packages_redhat:
+luks_clevis_packages_redhat:
   - clevis
   - clevis-tpm2
   - clevis-systemd
@@ -46,7 +46,7 @@ clevis_packages_redhat:
   - clevis-dracut
 
 # ── Alpine Linux ──────────────────────────────────────────────────────────
-lvm_packages_alpine:
+luks_lvm_packages_alpine:
   - lvm2
   - cryptsetup
   - e2fsprogs
@@ -56,10 +56,10 @@ lvm_packages_alpine:
   - util-linux
   - eudev
 
-clevis_packages_alpine:
+luks_clevis_packages_alpine:
   - clevis
 
 # ── TPM2 defaults (key_storage.type == tpm2) ─────────────────────────────
-tpm2_pcr_bank: "sha256"
-tpm2_pcr_ids: "1,7"
-tpm2_keep_keyfile: true   # keep keyfile as backup LUKS slot after Clevis bind
+luks_tpm2_pcr_bank: "sha256"
+luks_tpm2_pcr_ids: "1,7"
+luks_tpm2_keep_keyfile: true   # keep keyfile as backup LUKS slot after Clevis bind

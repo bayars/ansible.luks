@@ -1,5 +1,5 @@
 ---
-# Rotates LUKS key files for all volumes in spec.
+# Rotates LUKS key files for all volumes in luks_spec.
 # Flow per volume:
 #   1. Generate new key  →  <keys_path>/<lv_name>.new
 #   2. luksAddKey        →  add new key to a free LUKS slot (authenticated with current key)
@@ -7,14 +7,14 @@
 #   4. Replace keyfile   →  mv .new → current filename
 #   5. Sync backend      →  update remote host or Vault if applicable
 
-- name: Generate new key file ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+- name: Generate new key file
   ansible.builtin.command: >
     dd if=/dev/urandom
     of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
     bs=512 count=8
   changed_when: true
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -25,8 +25,8 @@
     owner: root
     group: root
     mode: "0400"
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -38,9 +38,9 @@
     {{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
     --key-file {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
     --batch-mode
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
   changed_when: true
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -51,9 +51,9 @@
     /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
     --key-file {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
     --batch-mode
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
   changed_when: true
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -62,9 +62,9 @@
   ansible.builtin.command: >
     mv {{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
     {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
   changed_when: true
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -73,18 +73,18 @@
 
 - name: Sync rotated keys to remote host
   ansible.builtin.include_tasks: key_storage/sync_remote.yml
-  loop: "{{ spec }}"
+  loop: "{{ luks_spec }}"
   loop_control:
     loop_var: disk
     label: "{{ disk.vg_name }}"
   when: disk.key_storage.type == 'remote_filesystem'
 
-- name: Read rotated key for Vault update ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+- name: Read rotated key for Vault update
   ansible.builtin.slurp:
     src: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  register: _rotated_key
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  register: luks_rotated_key
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -98,11 +98,11 @@
     mount_point: "{{ item.disks.0.key_storage.vault_mount | default('secret') }}"
     path: "{{ item.disks.0.key_storage.vault_path }}/{{ item.disks.1.lv_name }}"
     data:
-      key: "{{ item._rotated_key.content }}"
+      key: "{{ item.luks_rotated_key.content }}"
       lv_name: "{{ item.disks.1.lv_name }}"
       vg_name: "{{ item.disks.0.vg_name }}"
       hostname: "{{ ansible_hostname }}"
-  no_log: "{{ hide_logs }}"
-  loop: "{{ _rotated_key.results | selectattr('skipped', 'undefined') | list }}"
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_rotated_key.results | selectattr('skipped', 'undefined') | list }}"
   loop_control:
     label: "{{ item.disks.0.vg_name }}/{{ item.disks.1.lv_name }}"

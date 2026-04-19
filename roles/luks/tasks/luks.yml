@@ -7,7 +7,7 @@
     state: present
     fs_type: ext4
     flags: [lvm]
-  loop: "{{ spec }}"
+  loop: "{{ luks_spec }}"
   loop_control:
     loop_var: disk
     label: "{{ disk.disk_name }}"
@@ -16,7 +16,7 @@
   community.general.lvg:
     vg: "{{ disk.vg_name }}"
     pvs: "{{ disk.vg_path }}"
-  loop: "{{ spec }}"
+  loop: "{{ luks_spec }}"
   loop_control:
     loop_var: disk
     label: "{{ disk.vg_name }}"
@@ -28,8 +28,8 @@
     owner: root
     group: root
     mode: "0700"
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec }}"
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_spec }}"
   loop_control:
     loop_var: disk
     label: "{{ disk.vg_name }}"
@@ -38,17 +38,16 @@
 # filesystem / remote_filesystem / tpm2 → generate.yml (keyfile on disk)
 # vault                                 → vault.yml     (keyfile + Vault KV write)
 - name: Generate / store key files
-  ansible.builtin.include_tasks: >-
-    key_storage/{{ 'vault.yml' if disks.0.key_storage.type == 'vault' else 'generate.yml' }}
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  ansible.builtin.include_tasks:
+    file: "key_storage/{{ 'vault.yml' if disks.0.key_storage.type == 'vault' else 'generate.yml' }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
 
 - name: Sync key directory to remote host
   ansible.builtin.include_tasks: key_storage/sync_remote.yml
-  loop: "{{ spec }}"
+  loop: "{{ luks_spec }}"
   loop_control:
     loop_var: disk
     label: "{{ disk.vg_name }}"
@@ -56,8 +55,8 @@
 
 - name: Provision logical volumes and LUKS containers
   ansible.builtin.include_tasks: lv_creation.yml
-  no_log: "{{ hide_logs }}"
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  no_log: "{{ luks_hide_logs }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"

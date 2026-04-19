@@ -1,10 +1,11 @@
+---
 galaxy_info:
   author: Safa Bayar
   description: >-
     Provision LUKS2-encrypted LVM logical volumes with configurable key storage.
     Supports Debian/Ubuntu, RHEL/Rocky/CentOS, and Alpine Linux.
   license: MIT
-  min_ansible_version: "2.14"
+  min_ansible_version: "2.15"
   platforms:
     - name: Ubuntu
       versions:
@@ -21,9 +22,7 @@ galaxy_info:
         - "9"
     - name: Alpine
       versions:
-        - "3.18"
-        - "3.19"
-        - "3.20"
+        - all
   galaxy_tags:
     - luks
     - lvm

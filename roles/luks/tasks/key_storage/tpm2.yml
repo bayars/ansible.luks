@@ -3,16 +3,16 @@
 # A standard keyfile is generated here and used as the initial LUKS credential.
 # After the LUKS container is formatted, lv_creation.yml runs `clevis luks bind`
 # to add the TPM2 slot. The keyfile becomes a backup unlock method.
-# disks[0] = disk spec, disks[1] = lv_specification
+# disks[0] = disk luks_spec, disks[1] = lv_specification
 
-- name: Generate key file for TPM2 ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+- name: Generate key file for TPM2
   ansible.builtin.command: >
     dd if=/dev/urandom
     of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}
     bs=512 count=8
   args:
     creates: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
 
 - name: Restrict TPM2 key file to root read-only
   ansible.builtin.file:
@@ -20,4 +20,4 @@
     owner: root
     group: root
     mode: "0400"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"

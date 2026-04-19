@@ -1,44 +1,44 @@
 ---
 - name: Install LVM and LUKS packages (Debian / Ubuntu)
   ansible.builtin.apt:
-    name: "{{ lvm_packages_debian }}"
+    name: "{{ luks_lvm_packages_debian }}"
     state: present
     update_cache: true
   when: ansible_os_family == 'Debian'
 
 - name: Install LVM and LUKS packages (RHEL / Rocky / CentOS)
   ansible.builtin.dnf:
-    name: "{{ lvm_packages_redhat }}"
+    name: "{{ luks_lvm_packages_redhat }}"
     state: present
   when: ansible_os_family == 'RedHat'
 
 - name: Install LVM and LUKS packages (Alpine Linux)
   community.general.apk:
-    name: "{{ lvm_packages_alpine }}"
+    name: "{{ luks_lvm_packages_alpine }}"
     state: present
     update_cache: true
   when: ansible_os_family == 'Alpine'
 
 - name: Install Clevis packages (Debian / Ubuntu)
   ansible.builtin.apt:
-    name: "{{ clevis_packages_debian }}"
+    name: "{{ luks_clevis_packages_debian }}"
     state: present
   when:
-    - clevis_install | bool
+    - luks_clevis_install | bool
     - ansible_os_family == 'Debian'
 
 - name: Install Clevis packages (RHEL / Rocky / CentOS)
   ansible.builtin.dnf:
-    name: "{{ clevis_packages_redhat }}"
+    name: "{{ luks_clevis_packages_redhat }}"
     state: present
   when:
-    - clevis_install | bool
+    - luks_clevis_install | bool
     - ansible_os_family == 'RedHat'
 
 - name: Install Clevis packages (Alpine Linux)
   community.general.apk:
-    name: "{{ clevis_packages_alpine }}"
+    name: "{{ luks_clevis_packages_alpine }}"
     state: present
   when:
-    - clevis_install | bool
+    - luks_clevis_install | bool
     - ansible_os_family == 'Alpine'

@@ -1,7 +1,7 @@
 ---
 - name: Install packages
   ansible.builtin.include_tasks: packages.yml
-  when: lvm_install | bool
+  when: luks_lvm_install | bool
 
 - name: Encrypt — provision disks, create LUKS volumes
   ansible.builtin.include_tasks: luks.yml

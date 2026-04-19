@@ -6,13 +6,14 @@
 # Usage:
 #   ansible-playbook playbooks/decrypt.yml -i inventory/hosts
 
-- hosts: all
+- name: Unlock and mount LUKS volumes
+  hosts: all
   become: true
   vars:
     luks_action: decrypt
-    hide_logs: true
-    # spec must match exactly what was used during encrypt
-    spec:
+    luks_hide_logs: true
+    # luks_spec must match exactly what was used during encrypt
+    luks_spec:
       - disk_name: '/dev/sdb'
         pv_number: '1'
         vg_name: 'DATA'

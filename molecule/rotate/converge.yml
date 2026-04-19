@@ -17,7 +17,7 @@
     hide_logs: false
     lvm_install: false
     clevis_install: false
-    spec:
+    luks_spec:
       - disk_name: "{{ test_loop }}"
         pv_number: '1'
         vg_name: 'ROTATEVG'

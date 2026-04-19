@@ -1,12 +1,13 @@
 ---
-- hosts: localhost
+- name: Test LUKS encryption role
+  hosts: localhost
   remote_user: root
   vars:
     luks_action: encrypt
-    hide_logs: false
-    lvm_install: false
-    clevis_install: false
-    spec:
+    luks_hide_logs: false
+    luks_lvm_install: false
+    luks_clevis_install: false
+    luks_spec:
       - disk_name: '/dev/sda'
         pv_number: '1'
         vg_name: 'ROOT'

@@ -20,7 +20,7 @@
     hide_logs: false
     lvm_install: false     # packages installed in prepare.yml
     clevis_install: false
-    spec:
+    luks_spec:
       - disk_name: "{{ test_loop }}"
         pv_number: '1'
         vg_name: 'MOLECULE'

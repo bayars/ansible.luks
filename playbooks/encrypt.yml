@@ -1,18 +1,19 @@
 ---
 # Provision LUKS2-encrypted LVM volumes on target hosts.
-# Override spec and key_storage in group_vars or with -e @vars.yml.
+# Override luks_spec and key_storage in group_vars or with -e @vars.yml.
 #
 # Usage:
 #   ansible-playbook playbooks/encrypt.yml -i inventory/hosts
-#   ansible-playbook playbooks/encrypt.yml -i inventory/hosts -e hide_logs=false
+#   ansible-playbook playbooks/encrypt.yml -i inventory/hosts -e luks_hide_logs=false
 
-- hosts: all
+- name: Provision LUKS2-encrypted LVM volumes
+  hosts: all
   become: true
   vars:
     luks_action: encrypt
-    hide_logs: true
-    # Override spec here or supply via group_vars / host_vars / -e @vars.yml
-    spec:
+    luks_hide_logs: true
+    # Override luks_spec here or supply via group_vars / host_vars / -e @vars.yml
+    luks_spec:
       - disk_name: '/dev/sdb'
         pv_number: '1'
         vg_name: 'DATA'

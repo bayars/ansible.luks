@@ -1,14 +1,14 @@
 ---
 # vars file for bayars.luks.luks
 #
-# spec defines one or more disks to provision.
+# luks_spec defines one or more disks to provision.
 #
 # key_storage.type values:
 #   filesystem        - keys stored locally at keys_path (default, good for single-host)
 #   remote_filesystem - keys stored locally AND rsynced to a remote host via SSH
 #
 # lv_specifications.fstype is optional; defaults to ext4.
-spec:
+luks_spec:
   - disk_name: '/dev/sda'
     pv_number: '1'
     vg_name: 'ROOT'

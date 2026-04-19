@@ -2,7 +2,7 @@
 # Called per disk when key_storage.type == 'remote_filesystem'.
 # Rsyncs the entire keys_path directory to the remote key manager over SSH.
 # The local copy is retained so crypttab can use it at boot.
-# disk = disk spec item (set by the loop in luks.yml).
+# disk = disk luks_spec item (set by the loop in luks.yml).
 
 - name: Sync key directory to remote key manager ({{ disk.vg_name }})
   ansible.builtin.command: >
@@ -13,5 +13,5 @@
         -o UserKnownHostsFile=/dev/null"
     {{ disk.keys_path }}/
     {{ disk.key_storage.remote_user }}@{{ disk.key_storage.remote_host }}:{{ disk.key_storage.remote_path }}/
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
   changed_when: true

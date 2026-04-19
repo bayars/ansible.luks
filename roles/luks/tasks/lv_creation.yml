@@ -1,15 +1,15 @@
 ---
 # Called per (disk, lv) pair via subelements loop in luks.yml.
-# disks[0] = disk spec, disks[1] = lv_specification entry.
+# disks[0] = disk luks_spec, disks[1] = lv_specification entry.
 
-- name: Create logical volume ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+- name: Create logical volume
   community.general.lvol:
     vg: "{{ disks.1.vg_group }}"
     lv: "{{ disks.1.lv_name }}"
     size: "{{ disks.1.size }}"
     shrink: false
 
-- name: Create LUKS2 container on /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+- name: Create LUKS2 container
   community.crypto.luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: present
@@ -19,7 +19,7 @@
       algorithm: argon2id
       memory: "{{ disks.1.pbkdf_memory | default(1048576) }}"
       iteration_count: "{{ disks.1.pbkdf_iterations | default(4) }}"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
 
 # Clevis TPM2: bind the container to the TPM after LUKS format.
 # Creates an additional key slot; the keyfile remains as backup.
@@ -28,30 +28,30 @@
     clevis luks bind -y
     -k {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
     -d /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
-    tpm2 '{"pcr_bank":"{{ disks.0.key_storage.tpm2_pcr_bank | default(tpm2_pcr_bank) }}","pcr_ids":"{{ disks.0.key_storage.tpm2_pcr_ids | default(tpm2_pcr_ids) }}"}'
-  no_log: "{{ hide_logs }}"
+    tpm2 '{"pcr_bank":"{{ disks.0.key_storage.tpm2_pcr_bank | default(luks_tpm2_pcr_bank) }}","pcr_ids":"{{ disks.0.key_storage.tpm2_pcr_ids | default(luks_tpm2_pcr_ids) }}"}'
+  no_log: "{{ luks_hide_logs }}"
   changed_when: true
   when: disks.0.key_storage.type == 'tpm2'
 
-- name: Open LUKS container luks-{{ disks.1.lv_name }}
+- name: Open LUKS container
   community.crypto.luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: opened
     name: "luks-{{ disks.1.lv_name }}"
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
 
 # ── Swap volume ────────────────────────────────────────────────────────────
-- name: Set up encrypted swap ({{ disks.1.lv_name }})
+- name: Set up encrypted swap
   when: disks.1.fstype | default('ext4') == 'swap'
   block:
-    - name: Create swap filesystem on luks-{{ disks.1.lv_name }}
+    - name: Create swap filesystem
       community.general.filesystem:
         fstype: swap
         dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
         force: false
 
-    - name: Enable swap on luks-{{ disks.1.lv_name }}
+    - name: Enable swap
       ansible.builtin.command: swapon /dev/mapper/luks-{{ disks.1.lv_name }}
       changed_when: true
       failed_when: false
@@ -64,26 +64,26 @@
         opts: sw
         state: present
 
-    - name: Add crypttab entry for swap luks-{{ disks.1.lv_name }}
+    - name: Add crypttab entry for swap
       community.general.crypttab:
         name: "luks-{{ disks.1.lv_name }}"
         backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
         password: "{{ 'none' if disks.0.key_storage.type == 'tpm2' else disks.0.keys_path + '/' + disks.1.lv_name }}"
         opts: swap
         state: present
-      no_log: "{{ hide_logs }}"
+      no_log: "{{ luks_hide_logs }}"
 
 # ── Standard filesystem volume (ext4, xfs, btrfs) ─────────────────────────
-- name: Set up encrypted filesystem ({{ disks.1.lv_name }})
+- name: Set up encrypted filesystem
   when: disks.1.fstype | default('ext4') != 'swap'
   block:
-    - name: Create {{ disks.1.fstype | default('ext4') }} filesystem on luks-{{ disks.1.lv_name }}
+    - name: Create filesystem
       community.general.filesystem:
         fstype: "{{ disks.1.fstype | default('ext4') }}"
         dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
         force: false
 
-    - name: Create mount point {{ disks.1.mount_point }}
+    - name: Create mount point
       ansible.builtin.file:
         state: directory
         path: "{{ disks.1.mount_point }}"
@@ -91,7 +91,7 @@
         group: root
         mode: "0755"
 
-    - name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
+    - name: Mount filesystem
       ansible.posix.mount:
         path: "{{ disks.1.mount_point }}"
         src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
@@ -99,10 +99,10 @@
         opts: "{{ disks.1.mount_opts | default('defaults') }}"
         state: mounted
 
-    - name: Add crypttab entry for luks-{{ disks.1.lv_name }}
+    - name: Add crypttab entry
       community.general.crypttab:
         name: "luks-{{ disks.1.lv_name }}"
         backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
         password: "{{ 'none' if disks.0.key_storage.type == 'tpm2' else disks.0.keys_path + '/' + disks.1.lv_name }}"
         state: present
-      no_log: "{{ hide_logs }}"
+      no_log: "{{ luks_hide_logs }}"

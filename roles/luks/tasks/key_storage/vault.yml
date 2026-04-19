@@ -3,16 +3,16 @@
 # Generates a local key file, then writes it (base64-encoded) to Vault.
 # The local copy is kept so crypttab can unlock volumes at boot.
 # Set vault_token via env var VAULT_TOKEN or an Ansible-vault-encrypted variable.
-# disks[0] = disk spec, disks[1] = lv_specification
+# disks[0] = disk luks_spec, disks[1] = lv_specification
 
-- name: Generate key file for Vault storage ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+- name: Generate key file for Vault storage
   ansible.builtin.command: >
     dd if=/dev/urandom
     of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}
     bs=512 count=8
   args:
     creates: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
 
 - name: Restrict Vault key file to root read-only
   ansible.builtin.file:
@@ -20,13 +20,13 @@
     owner: root
     group: root
     mode: "0400"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"
 
 - name: Read key file for Vault upload
   ansible.builtin.slurp:
     src: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  register: _key_content
-  no_log: "{{ hide_logs }}"
+  register: luks_key_content
+  no_log: "{{ luks_hide_logs }}"
 
 - name: Write key to HashiCorp Vault KV v2
   community.hashi_vault.vault_kv2_write:
@@ -36,8 +36,8 @@
     mount_point: "{{ disks.0.key_storage.vault_mount | default('secret') }}"
     path: "{{ disks.0.key_storage.vault_path }}/{{ disks.1.lv_name }}"
     data:
-      key: "{{ _key_content.content }}"
+      key: "{{ luks_key_content.content }}"
       lv_name: "{{ disks.1.lv_name }}"
       vg_name: "{{ disks.0.vg_name }}"
       hostname: "{{ ansible_hostname }}"
-  no_log: "{{ hide_logs }}"
+  no_log: "{{ luks_hide_logs }}"

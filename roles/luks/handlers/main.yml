@@ -4,9 +4,11 @@
 - name: Update initramfs (Debian/Ubuntu)
   ansible.builtin.command: update-initramfs -u -k all
   listen: update_initramfs
+  changed_when: true
   when: ansible_os_family == 'Debian'
 
 - name: Update initramfs (RHEL/Rocky/CentOS)
   ansible.builtin.command: dracut --force
   listen: update_initramfs
+  changed_when: true
   when: ansible_os_family == 'RedHat'

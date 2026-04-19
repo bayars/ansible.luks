@@ -1,12 +1,12 @@
 ---
-# Gracefully unmounts and closes all LUKS volumes defined in spec.
+# Gracefully unmounts and closes all LUKS volumes defined in luks_spec.
 # Safe to run on live systems — unmounts before closing the container.
 
 - name: Unmount LUKS volume {{ disks.1.mount_point }}
   ansible.posix.mount:
     path: "{{ disks.1.mount_point }}"
     state: unmounted
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -14,7 +14,7 @@
 
 - name: Disable swap on luks-{{ disks.1.lv_name }}
   ansible.builtin.command: swapoff /dev/mapper/luks-{{ disks.1.lv_name }}
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
@@ -26,7 +26,7 @@
   community.crypto.luks_device:
     name: "luks-{{ disks.1.lv_name }}"
     state: closed
-  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop: "{{ luks_spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
     label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
