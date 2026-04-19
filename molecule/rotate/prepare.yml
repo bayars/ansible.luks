@@ -1,0 +1,34 @@
+---
+- hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    test_img: /tmp/molecule-rotate-disk.img
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name: [lvm2, cryptsetup, cryptsetup-bin, util-linux, parted, e2fsprogs]
+        state: present
+        update_cache: true
+
+    - name: Load dm-crypt kernel module
+      community.general.modprobe:
+        name: dm_crypt
+        state: present
+
+    - name: Create sparse image file
+      ansible.builtin.command:
+        cmd: truncate -s 2G {{ test_img }}
+        creates: "{{ test_img }}"
+
+    - name: Attach loop device
+      ansible.builtin.command: losetup --find --partscan --show {{ test_img }}
+      register: _loop
+      changed_when: true
+
+    - name: Persist loop device path
+      ansible.builtin.copy:
+        content: "{{ _loop.stdout | trim }}"
+        dest: /tmp/molecule-loop-device
+        mode: "0600"

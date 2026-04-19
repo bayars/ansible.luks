@@ -1,0 +1,108 @@
+---
+# Rotates LUKS key files for all volumes in spec.
+# Flow per volume:
+#   1. Generate new key  →  <keys_path>/<lv_name>.new
+#   2. luksAddKey        →  add new key to a free LUKS slot (authenticated with current key)
+#   3. luksRemoveKey     →  remove the old key slot
+#   4. Replace keyfile   →  mv .new → current filename
+#   5. Sync backend      →  update remote host or Vault if applicable
+
+- name: Generate new key file ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+  ansible.builtin.command: >
+    dd if=/dev/urandom
+    of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
+    bs=512 count=8
+  changed_when: true
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+- name: Restrict new key file permissions
+  ansible.builtin.file:
+    path: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new"
+    owner: root
+    group: root
+    mode: "0400"
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+- name: Add new key to LUKS container
+  ansible.builtin.command: >
+    cryptsetup luksAddKey
+    /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+    {{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
+    --key-file {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+    --batch-mode
+  no_log: "{{ hide_logs }}"
+  changed_when: true
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+- name: Remove old key from LUKS container
+  ansible.builtin.command: >
+    cryptsetup luksRemoveKey
+    /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+    --key-file {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+    --batch-mode
+  no_log: "{{ hide_logs }}"
+  changed_when: true
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+- name: Promote new key file to active
+  ansible.builtin.command: >
+    mv {{ disks.0.keys_path }}/{{ disks.1.lv_name }}.new
+    {{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+  no_log: "{{ hide_logs }}"
+  changed_when: true
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+# ── Backend sync after rotation ────────────────────────────────────────────
+
+- name: Sync rotated keys to remote host
+  ansible.builtin.include_tasks: key_storage/sync_remote.yml
+  loop: "{{ spec }}"
+  loop_control:
+    loop_var: disk
+    label: "{{ disk.vg_name }}"
+  when: disk.key_storage.type == 'remote_filesystem'
+
+- name: Read rotated key for Vault update ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+  ansible.builtin.slurp:
+    src: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+  register: _rotated_key
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+  when: disks.0.key_storage.type == 'vault'
+
+- name: Update rotated key in HashiCorp Vault
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ item.disks.0.key_storage.vault_url }}"
+    auth_method: "{{ item.disks.0.key_storage.vault_auth_method | default('token') }}"
+    token: "{{ item.disks.0.key_storage.vault_token | default(omit) }}"
+    mount_point: "{{ item.disks.0.key_storage.vault_mount | default('secret') }}"
+    path: "{{ item.disks.0.key_storage.vault_path }}/{{ item.disks.1.lv_name }}"
+    data:
+      key: "{{ item._rotated_key.content }}"
+      lv_name: "{{ item.disks.1.lv_name }}"
+      vg_name: "{{ item.disks.0.vg_name }}"
+      hostname: "{{ ansible_hostname }}"
+  no_log: "{{ hide_logs }}"
+  loop: "{{ _rotated_key.results | selectattr('skipped', 'undefined') | list }}"
+  loop_control:
+    label: "{{ item.disks.0.vg_name }}/{{ item.disks.1.lv_name }}"

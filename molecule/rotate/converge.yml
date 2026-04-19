@@ -1,0 +1,64 @@
+---
+- hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Read loop device path
+      ansible.builtin.slurp:
+        src: /tmp/molecule-loop-device
+      register: _loop_raw
+
+    - name: Set loop device fact
+      ansible.builtin.set_fact:
+        test_loop: "{{ _loop_raw.content | b64decode | trim }}"
+
+  vars:
+    hide_logs: false
+    lvm_install: false
+    clevis_install: false
+    spec:
+      - disk_name: "{{ test_loop }}"
+        pv_number: '1'
+        vg_name: 'ROTATEVG'
+        vg_path: "{{ test_loop }}p1"
+        keys_path: "/tmp/molecule-rotate-keys"
+        lv_specifications:
+          - lv_name: "rotatelv"
+            mount_point: "/mnt/rotate-test"
+            size: "512M"
+            vg_group: "ROTATEVG"
+            fstype: "ext4"
+        key_storage:
+          type: filesystem
+
+  tasks:
+    - name: Encrypt volumes
+      ansible.builtin.include_role:
+        name: bayars.luks
+      vars:
+        luks_action: encrypt
+
+    - name: Capture key fingerprint before rotation
+      ansible.builtin.stat:
+        path: /tmp/molecule-rotate-keys/rotatelv
+      register: _key_before
+
+    - name: Rotate keys
+      ansible.builtin.include_role:
+        name: bayars.luks
+      vars:
+        luks_action: rotate
+
+    - name: Capture key fingerprint after rotation
+      ansible.builtin.stat:
+        path: /tmp/molecule-rotate-keys/rotatelv
+      register: _key_after
+
+    - name: Store fingerprints for verify
+      ansible.builtin.copy:
+        content: |
+          before: {{ _key_before.stat.checksum }}
+          after: {{ _key_after.stat.checksum }}
+        dest: /tmp/molecule-rotate-fingerprints
+        mode: "0600"

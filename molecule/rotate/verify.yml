@@ -1,0 +1,46 @@
+---
+- hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Read fingerprint file
+      ansible.builtin.slurp:
+        src: /tmp/molecule-rotate-fingerprints
+      register: _fp_raw
+
+    - name: Parse fingerprints
+      ansible.builtin.set_fact:
+        _fp: "{{ _fp_raw.content | b64decode | from_yaml }}"
+
+    - name: Assert key file changed after rotation
+      ansible.builtin.assert:
+        that: _fp.before != _fp.after
+        fail_msg: "Key file checksum unchanged — rotation did not replace the key"
+
+    - name: Assert rotated key file is present and mode 0400
+      ansible.builtin.stat:
+        path: /tmp/molecule-rotate-keys/rotatelv
+      register: _key
+    - ansible.builtin.assert:
+        that:
+          - _key.stat.exists
+          - _key.stat.mode == '0400'
+        fail_msg: "Key file missing or wrong permissions after rotation"
+
+    - name: Assert LUKS container opens with new key
+      ansible.builtin.command: >
+        cryptsetup open
+        /dev/ROTATEVG/rotatelv
+        luks-rotatelv-verify
+        --key-file /tmp/molecule-rotate-keys/rotatelv
+        --test-passphrase
+      changed_when: false
+
+    - name: Assert volume is still mounted after rotation
+      ansible.builtin.command: mountpoint -q /mnt/rotate-test
+      register: _mount
+      changed_when: false
+    - ansible.builtin.assert:
+        that: _mount.rc == 0
+        fail_msg: "/mnt/rotate-test is not mounted after key rotation"
