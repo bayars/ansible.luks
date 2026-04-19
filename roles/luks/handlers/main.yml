@@ -1,2 +1,12 @@
 ---
-# handlers file for luks
+# handlers file for safabayar.luks
+
+- name: Update initramfs (Debian/Ubuntu)
+  ansible.builtin.command: update-initramfs -u -k all
+  listen: update_initramfs
+  when: ansible_os_family == 'Debian'
+
+- name: Update initramfs (RHEL/Rocky/CentOS)
+  ansible.builtin.command: dracut --force
+  listen: update_initramfs
+  when: ansible_os_family == 'RedHat'

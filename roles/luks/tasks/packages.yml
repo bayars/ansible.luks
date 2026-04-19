@@ -1,0 +1,29 @@
+---
+- name: Install LVM and LUKS packages (Debian / Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ lvm_packages_debian }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Install LVM and LUKS packages (RHEL / Rocky / CentOS)
+  ansible.builtin.dnf:
+    name: "{{ lvm_packages_redhat }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install Clevis packages (Debian / Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ clevis_packages_debian }}"
+    state: present
+  when:
+    - clevis_install | bool
+    - ansible_os_family == 'Debian'
+
+- name: Install Clevis packages (RHEL / Rocky / CentOS)
+  ansible.builtin.dnf:
+    name: "{{ clevis_packages_redhat }}"
+    state: present
+  when:
+    - clevis_install | bool
+    - ansible_os_family == 'RedHat'

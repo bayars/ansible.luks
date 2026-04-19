@@ -1,10 +1,10 @@
 galaxy_info:
   author: Safa Bayar
-  description: Ansible role to provision LUKS2-encrypted LVM logical volumes with key file management
+  description: >-
+    Provision LUKS2-encrypted LVM logical volumes with configurable key storage.
+    Supports Debian/Ubuntu and RHEL/Rocky/CentOS.
   license: MIT
-
-  min_ansible_version: "2.10"
-
+  min_ansible_version: "2.14"
   platforms:
     - name: Ubuntu
       versions:
@@ -15,12 +15,20 @@ galaxy_info:
       versions:
         - bullseye
         - bookworm
-
+    - name: EL
+      versions:
+        - "8"
+        - "9"
   galaxy_tags:
     - luks
     - lvm
     - encryption
     - storage
     - security
+
+collections:
+  - community.general
+  - community.crypto
+  - ansible.posix
 
 dependencies: []

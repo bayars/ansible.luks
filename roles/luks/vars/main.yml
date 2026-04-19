@@ -1,6 +1,13 @@
 ---
-# vars file for luks
-# vg_path may be added with multiple device names
+# vars file for safabayar.luks
+#
+# spec defines one or more disks to provision.
+#
+# key_storage.type values:
+#   filesystem        - keys stored locally at keys_path (default, good for single-host)
+#   remote_filesystem - keys stored locally AND rsynced to a remote host via SSH
+#
+# lv_specifications.fstype is optional; defaults to ext4.
 spec:
   - disk_name: '/dev/sda'
     pv_number: '1'
@@ -9,16 +16,18 @@ spec:
     keys_path: "/vault/{{ ansible_hostname }}/secrets"
     lv_specifications:
       - lv_name: "root"
-        mount_point: "/root"
+        mount_point: "/mnt/root"
         size: "5G"
         vg_group: "ROOT"
-      - lv_name: "BACKUP"
-        mount_point: "/mnt"
+        fstype: "ext4"
+      - lv_name: "backup"
+        mount_point: "/mnt/backup"
         size: "100G"
         vg_group: "ROOT"
+        fstype: "ext4"
     key_storage:
-      local_storage: true
-      remote_storage: true
+      type: filesystem
+      # Required only when type == remote_filesystem:
       remote_host: "192.168.1.1"
       remote_user: "root"
       remote_path: "/vault/{{ ansible_hostname }}/secrets"

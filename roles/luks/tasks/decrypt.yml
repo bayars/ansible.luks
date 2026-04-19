@@ -1,0 +1,39 @@
+---
+# Unlock and mount already-provisioned LUKS volumes.
+# Key files must be present at keys_path on the target host.
+# If key_storage.type == remote_filesystem, fetch keys first (see docs/key_storage.md).
+
+- name: Open LUKS container luks-{{ disks.1.lv_name }}
+  community.crypto.luks_device:
+    device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+    state: opened
+    name: "luks-{{ disks.1.lv_name }}"
+    keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+
+- name: Ensure mount point exists for {{ disks.1.mount_point }}
+  ansible.builtin.file:
+    state: directory
+    path: "{{ disks.1.mount_point }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.1.mount_point }}"
+
+- name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
+  ansible.posix.mount:
+    path: "{{ disks.1.mount_point }}"
+    src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+    fstype: "{{ disks.1.fstype | default('ext4') }}"
+    state: mounted
+  loop: "{{ spec | subelements('lv_specifications') }}"
+  loop_control:
+    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"

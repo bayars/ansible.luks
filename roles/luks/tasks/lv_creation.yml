@@ -1,58 +1,59 @@
 ---
-- name: Create logical volume
-  lvol:
+# Called per (disk, lv) pair via subelements loop in luks.yml.
+# disks[0] = disk spec, disks[1] = lv_specification entry.
+
+- name: Create logical volume ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+  community.general.lvol:
     vg: "{{ disks.1.vg_group }}"
     lv: "{{ disks.1.lv_name }}"
     size: "{{ disks.1.size }}"
     shrink: false
-  no_log: false
 
-- name: Create LUKS2 container on logical volume
-  luks_device:
+- name: Create LUKS2 container on /dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}
+  community.crypto.luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: present
     type: luks2
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
     pbkdf:
-      algorithm: pbkdf2
+      algorithm: argon2id
       memory: 1048576
-  no_log: false
+      iteration_count: 4
+  no_log: "{{ hide_logs }}"
 
-- name: Open LUKS container
-  luks_device:
+- name: Open LUKS container luks-{{ disks.1.lv_name }}
+  community.crypto.luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: opened
     name: "luks-{{ disks.1.lv_name }}"
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  no_log: false
+  no_log: "{{ hide_logs }}"
 
-- name: Create ext4 filesystem on LUKS container
-  filesystem:
-    fstype: ext4
+- name: Create {{ disks.1.fstype | default('ext4') }} filesystem on luks-{{ disks.1.lv_name }}
+  community.general.filesystem:
+    fstype: "{{ disks.1.fstype | default('ext4') }}"
     dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
-  no_log: false
+    force: false
 
-- name: Create mount point directory
-  file:
+- name: Create mount point {{ disks.1.mount_point }}
+  ansible.builtin.file:
     state: directory
     path: "{{ disks.1.mount_point }}"
     owner: root
     group: root
     mode: "0755"
-  no_log: false
 
-- name: Mount LUKS volume
-  mount:
+- name: Mount luks-{{ disks.1.lv_name }} at {{ disks.1.mount_point }}
+  ansible.posix.mount:
     path: "{{ disks.1.mount_point }}"
     src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
-    fstype: ext4
+    fstype: "{{ disks.1.fstype | default('ext4') }}"
     state: mounted
-  no_log: false
 
-- name: Add crypttab entry for auto-unlock
-  crypttab:
+- name: Add crypttab entry for luks-{{ disks.1.lv_name }}
+  community.general.crypttab:
     name: "luks-{{ disks.1.lv_name }}"
     backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     password: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
     state: present
-  no_log: false
+  no_log: "{{ hide_logs }}"

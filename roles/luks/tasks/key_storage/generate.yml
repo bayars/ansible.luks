@@ -1,0 +1,20 @@
+---
+# Called per (disk, lv) pair via subelements loop in luks.yml.
+# disks[0] = disk spec, disks[1] = lv_specification entry.
+
+- name: Generate LUKS key file ({{ disks.0.vg_name }}/{{ disks.1.lv_name }})
+  ansible.builtin.command: >
+    dd if=/dev/urandom
+    of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}
+    bs=512 count=8
+  args:
+    creates: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+  no_log: "{{ hide_logs }}"
+
+- name: Restrict key file to root read-only
+  ansible.builtin.file:
+    path: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+    owner: root
+    group: root
+    mode: "0400"
+  no_log: "{{ hide_logs }}"

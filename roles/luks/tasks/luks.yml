@@ -1,83 +1,59 @@
 ---
 - name: Partition disk and set LVM flag
-  parted:
-    device: "{{ disks.disk_name }}"
+  community.general.parted:
+    device: "{{ disk.disk_name }}"
     label: gpt
-    number: "{{ disks.pv_number }}"
+    number: "{{ disk.pv_number }}"
     state: present
     fs_type: ext4
     flags: [lvm]
-  no_log: false
-  with_items: "{{ spec }}"
+  loop: "{{ spec }}"
   loop_control:
-    loop_var: disks
+    loop_var: disk
+    label: "{{ disk.disk_name }}"
 
-- name: Create volume groups
-  lvg:
-    vg: "{{ disks.vg_name }}"
-    pvs: "{{ disks.vg_path }}"
-  no_log: false
-  with_items: "{{ spec }}"
+- name: Create LVM volume groups
+  community.general.lvg:
+    vg: "{{ disk.vg_name }}"
+    pvs: "{{ disk.vg_path }}"
+  loop: "{{ spec }}"
   loop_control:
-    loop_var: disks
+    loop_var: disk
+    label: "{{ disk.vg_name }}"
 
-- name: Create vault key directory
-  file:
+- name: Create key storage directories
+  ansible.builtin.file:
     state: directory
-    path: "{{ disks.keys_path }}"
+    path: "{{ disk.keys_path }}"
     owner: root
     group: root
     mode: "0700"
-  no_log: false
-  with_items: "{{ spec }}"
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec }}"
   loop_control:
-    loop_var: disks
+    loop_var: disk
+    label: "{{ disk.vg_name }}"
 
-- name: Generate LUKS key file if not present
-  command: >
-    dd if=/dev/urandom
-    of={{ disks.0.keys_path }}/{{ disks.1.lv_name }}
-    bs=1024 count=4
-  args:
-    creates: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-  no_log: false
-  with_subelements:
-    - "{{ spec }}"
-    - lv_specifications
+- name: Generate key files and provision LUKS volumes
+  ansible.builtin.include_tasks: key_storage/generate.yml
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
 
-- name: Set LUKS key file permissions
-  file:
-    state: file
-    path: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
-    owner: root
-    group: root
-    mode: "0400"
-  no_log: false
-  with_subelements:
-    - "{{ spec }}"
-    - lv_specifications
+- name: Sync key directory to remote host
+  ansible.builtin.include_tasks: key_storage/sync_remote.yml
+  loop: "{{ spec }}"
   loop_control:
-    loop_var: disks
+    loop_var: disk
+    label: "{{ disk.vg_name }}"
+  when: disk.key_storage.type == 'remote_filesystem'
 
-- name: Sync key files to remote key manager
-  command: >
-    rsync -avz
-    -e "ssh -i {{ disks.key_storage.remote_key }} -p {{ disks.key_storage.remote_port }} -o StrictHostKeyChecking=no"
-    {{ disks.keys_path }}/
-    {{ disks.key_storage.remote_user }}@{{ disks.key_storage.remote_host }}:{{ disks.key_storage.remote_path }}/
-  no_log: false
-  with_items: "{{ spec }}"
+- name: Provision logical volumes and LUKS containers
+  ansible.builtin.include_tasks: lv_creation.yml
+  no_log: "{{ hide_logs }}"
+  loop: "{{ spec | subelements('lv_specifications') }}"
   loop_control:
     loop_var: disks
-  when: disks.key_storage.remote_storage | bool
-
-- name: Create logical volumes and LUKS containers
-  include_tasks: lv_creation.yml
-  no_log: false
-  with_subelements:
-    - "{{ spec }}"
-    - lv_specifications
-  loop_control:
-    loop_var: disks
+    label: "{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"

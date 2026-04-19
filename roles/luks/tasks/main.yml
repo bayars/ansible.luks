@@ -1,20 +1,12 @@
 ---
-- name: Install LVM and LUKS packages
-  become: true
-  apt:
-    name: "{{ lvm_packages }}"
-    state: present
-    update_cache: true
+- name: Install packages
+  ansible.builtin.include_tasks: packages.yml
   when: lvm_install | bool
 
-- name: Install Clevis packages
-  become: true
-  apt:
-    name: "{{ clevis_packages }}"
-    state: present
-  when: clevis_install | bool
+- name: Encrypt — provision disks, create LUKS volumes
+  ansible.builtin.include_tasks: luks.yml
+  when: luks_action == 'encrypt'
 
-- name: Run LUKS provisioning tasks
-  become: true
-  ansible.builtin.import_tasks: luks.yml
-  no_log: "{{ hide_logs }}"
+- name: Decrypt — unlock and mount LUKS volumes
+  ansible.builtin.include_tasks: decrypt.yml
+  when: luks_action == 'decrypt'

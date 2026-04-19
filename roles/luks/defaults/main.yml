@@ -1,15 +1,23 @@
 ---
-# defaults file for luks
+# Action to perform: encrypt (provision) or decrypt (unlock and mount)
+luks_action: encrypt
 
+# Set true in production to suppress key paths from Ansible output
 hide_logs: true
 
-lvm_packages:
-  - initramfs-tools
-  - lvm2
-  - rsync
-  - cryptsetup
+# Package installation flags
+lvm_install: true
+clevis_install: false
 
-clevis_packages:
+# Debian / Ubuntu
+lvm_packages_debian:
+  - lvm2
+  - cryptsetup
+  - cryptsetup-bin
+  - initramfs-tools
+  - rsync
+
+clevis_packages_debian:
   - clevis
   - clevis-tpm2
   - clevis-systemd
@@ -17,5 +25,16 @@ clevis_packages:
   - clevis-dracut
   - clevis-udisks2
 
-lvm_install: true
-clevis_install: false
+# RHEL / Rocky Linux / CentOS
+lvm_packages_redhat:
+  - lvm2
+  - cryptsetup
+  - dracut
+  - rsync
+
+clevis_packages_redhat:
+  - clevis
+  - clevis-tpm2
+  - clevis-systemd
+  - clevis-luks
+  - clevis-dracut
