@@ -1,86 +1,151 @@
-# ansible.luks
+# safabayar.luks
 
-Ansible role that provisions LUKS2-encrypted LVM logical volumes. For each disk it:
+Ansible collection that provisions and manages LUKS2-encrypted LVM logical volumes.
 
-1. Partitions the disk (GPT, LVM flag)
-2. Creates an LVM volume group
-3. Generates a random key file per logical volume and stores it under `keys_path`
-4. Creates the logical volumes
-5. Formats each logical volume as a LUKS2 container using the generated key file
-6. Opens the container, creates an ext4 filesystem, mounts it, and adds a `crypttab` entry
+**Supports:** Debian · Ubuntu · Rocky Linux · CentOS Stream · RHEL  
+**Galaxy:** `ansible-galaxy collection install safabayar.luks`
+
+---
+
+## Features
+
+- Partitions disks, creates LVM volume groups and logical volumes
+- Formats each LV as a LUKS2 container (Argon2id PBKDF)
+- Creates filesystems, mounts volumes, and writes `/etc/crypttab` entries for auto-unlock at boot
+- **Multi-OS:** uses `apt` on Debian/Ubuntu, `dnf` on RHEL/Rocky/CentOS
+- **Key storage backends:** local filesystem or remote filesystem (rsync over SSH)
+- **Decrypt action:** unlock and mount already-provisioned volumes without reprovisioning
+
+---
 
 ## Requirements
 
-- Debian / Ubuntu target host
-- Packages installed by this role: `lvm2`, `cryptsetup`, `rsync`, `initramfs-tools`
-- Ansible >= 2.10
-- `community.general` collection (for `lvg`, `lvol`, `crypttab`, `parted`, `filesystem`, `mount`)
-
-## Role Variables
-
-All variables are set through the `spec` list. Each item describes one disk:
-
-```yaml
-spec:
-  - disk_name: '/dev/sda'          # block device path
-    pv_number: '1'                 # partition number to create
-    vg_name: 'ROOT'                # LVM volume group name
-    vg_path: '/dev/sda1'          # PV path (partition created above)
-    keys_path: "/vault/{{ ansible_hostname }}/secrets"  # local key storage path
-    lv_specifications:
-      - lv_name: "root"            # logical volume name (also used as key filename)
-        mount_point: "/mnt/root"   # where to mount after LUKS open
-        size: "5G"                 # LVM size (supports 100%FREE)
-        vg_group: "ROOT"           # must match vg_name above
-    key_storage:
-      local_storage: true          # keep key files on target host
-      remote_storage: false        # rsync keys to a remote key manager
-      remote_host: "192.168.1.1"
-      remote_user: "root"
-      remote_path: "/vault/{{ ansible_hostname }}/secrets"
-      remote_port: "22"
-      remote_key: "/vault/{{ ansible_hostname }}/secrets/ansible_rsa"
+```bash
+ansible-galaxy collection install -r requirements.yml
 ```
 
-### Defaults (`defaults/main.yml`)
+`requirements.yml`:
+```yaml
+collections:
+  - name: community.general
+    version: ">=8.0.0"
+  - name: community.crypto
+    version: ">=2.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"
+```
+
+---
+
+## Quick start
+
+### Encrypt (provision)
+
+```bash
+ansible-playbook playbooks/encrypt.yml -i inventory/hosts
+```
+
+### Decrypt (unlock after reboot)
+
+```bash
+ansible-playbook playbooks/decrypt.yml -i inventory/hosts
+```
+
+---
+
+## Role variables
+
+### `spec` (required)
+
+List of disks to provision. Each entry:
+
+| Field | Required | Description |
+|---|---|---|
+| `disk_name` | yes | Block device path, e.g. `/dev/sdb` |
+| `pv_number` | yes | Partition number to create |
+| `vg_name` | yes | LVM volume group name |
+| `vg_path` | yes | Physical volume path (the partition created above) |
+| `keys_path` | yes | Directory on the target host where key files are stored |
+| `lv_specifications` | yes | List of logical volumes (see below) |
+| `key_storage` | yes | Key storage configuration (see below) |
+
+Each `lv_specifications` entry:
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `lv_name` | yes | — | LV name; also used as the key filename and LUKS mapper name |
+| `mount_point` | yes | — | Where to mount the volume |
+| `size` | yes | — | LVM size string, e.g. `5G`, `100%FREE` |
+| `vg_group` | yes | — | Must match the parent `vg_name` |
+| `fstype` | no | `ext4` | Filesystem type (`ext4`, `xfs`) |
+
+`key_storage` fields:
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | yes | `filesystem` or `remote_filesystem` |
+| `remote_host` | if remote | Hostname / IP of the remote key manager |
+| `remote_user` | if remote | SSH user on the remote host |
+| `remote_path` | if remote | Destination path on the remote host |
+| `remote_port` | if remote | SSH port (default `22`) |
+| `remote_key` | if remote | Path to the SSH private key on the target host |
+
+### Other defaults
 
 | Variable | Default | Description |
 |---|---|---|
-| `hide_logs` | `true` | Suppress task output containing key material |
-| `lvm_install` | `true` | Install LVM/LUKS packages |
+| `luks_action` | `encrypt` | `encrypt` to provision, `decrypt` to unlock |
+| `hide_logs` | `true` | Suppress key paths from Ansible output |
+| `lvm_install` | `true` | Install LVM and LUKS packages |
 | `clevis_install` | `false` | Install Clevis TPM2 packages |
 
-## Example Playbook
+---
+
+## Example playbook
 
 ```yaml
 - hosts: storage_nodes
   become: true
   vars:
+    luks_action: encrypt
     hide_logs: true
     spec:
       - disk_name: '/dev/sdb'
         pv_number: '1'
         vg_name: 'DATA'
         vg_path: '/dev/sdb1'
-        keys_path: "/vault/{{ ansible_hostname }}/secrets"
+        keys_path: "/var/lib/luks-keys/{{ ansible_hostname }}"
         lv_specifications:
           - lv_name: "data"
             mount_point: "/data"
             size: "100%FREE"
             vg_group: "DATA"
+            fstype: "ext4"
         key_storage:
-          local_storage: true
-          remote_storage: false
+          type: filesystem
   roles:
-    - role: ansible.luks
+    - role: safabayar.luks
 ```
 
-## Security Notes
+To use remote key backup:
 
-- Key files are generated with `dd if=/dev/urandom` (4 KB) and stored with mode `0400`
-- The `keys_path` directory is created with mode `0700` (root only)
-- Set `hide_logs: true` in production to prevent key paths from appearing in Ansible output
-- Key files are never deleted by this role; back them up before reprovisioning
+```yaml
+        key_storage:
+          type: remote_filesystem
+          remote_host: "10.0.0.5"
+          remote_user: "keystore"
+          remote_path: "/vault/{{ ansible_hostname }}/secrets"
+          remote_port: "22"
+          remote_key: "/root/.ssh/keymanager_ed25519"
+```
+
+---
+
+## Key storage
+
+See [docs/key_storage.md](docs/key_storage.md) for security recommendations, key rotation, and how to restore keys from a remote host before running the decrypt playbook.
+
+---
 
 ## License
 

@@ -1,0 +1,27 @@
+---
+profile: production
+
+exclude_paths:
+  - .git/
+  - dist/
+  - molecule/
+
+skip_list:
+  # dd for key generation — intentional, no module equivalent
+  - command-instead-of-module
+  # rsync task explicitly sets changed_when: true
+  - no-changed-when[cmd]
+
+warn_list:
+  - yaml[line-length]
+
+use_default_rules: true
+
+mock_modules:
+  - community.general.parted
+  - community.general.lvg
+  - community.general.lvol
+  - community.general.filesystem
+  - community.general.crypttab
+  - community.crypto.luks_device
+  - ansible.posix.mount
