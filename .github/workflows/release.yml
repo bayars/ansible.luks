@@ -1,0 +1,61 @@
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  release:
+    name: Build · Release · Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create GitHub Releases
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ansible-core
+        run: pip install ansible-core
+
+      # Strip the leading 'v' from the tag to get the semver version
+      - name: Derive version from tag
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Patch the version in galaxy.yml to match the pushed tag so the
+      # published tarball and Galaxy metadata are always in sync.
+      - name: Align galaxy.yml version with tag
+        run: >
+          sed -i
+          "s/^version:.*/version: ${{ steps.version.outputs.value }}/"
+          galaxy.yml
+
+      - name: Build collection
+        run: ansible-galaxy collection build --output-path dist/
+
+      - name: Locate tarball
+        id: tarball
+        run: echo "path=$(ls dist/*.tar.gz)" >> "$GITHUB_OUTPUT"
+
+      # Create a GitHub Release and attach the collection tarball.
+      # Release notes are auto-generated from commits since the last tag.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.tarball.outputs.path }}
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+
+      # Publish to Ansible Galaxy.
+      # Set GALAXY_API_KEY in: Settings → Secrets and variables → Actions.
+      - name: Publish to Ansible Galaxy
+        run: >
+          ansible-galaxy collection publish
+          "${{ steps.tarball.outputs.path }}"
+          --token "${{ secrets.GALAXY_API_KEY }}"

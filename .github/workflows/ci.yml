@@ -1,0 +1,109 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Syntax check against multiple Ansible versions ────────────────────────
+  syntax:
+    name: Syntax (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - "2.14"
+          - "2.15"
+          - "2.16"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ansible-core ${{ matrix.ansible }}
+        run: pip install "ansible-core~=${{ matrix.ansible }}.0"
+
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Syntax check — encrypt playbook
+        run: >
+          ansible-playbook playbooks/encrypt.yml
+          -i tests/inventory --syntax-check
+
+      - name: Syntax check — decrypt playbook
+        run: >
+          ansible-playbook playbooks/decrypt.yml
+          -i tests/inventory --syntax-check
+
+  # ── Molecule integration tests ─────────────────────────────────────────────
+  # Uses privileged Docker containers with a loop device to run actual LUKS
+  # operations (parted → lvg → cryptsetup → mount) without a bare-metal host.
+  molecule:
+    name: Molecule (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - ubuntu2204
+          - ubuntu2404
+          - debian12
+          - rockylinux9
+    env:
+      MOLECULE_DISTRO: ${{ matrix.distro }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Molecule and dependencies
+        run: >
+          pip install
+          "ansible-core>=2.14"
+          ansible-lint
+          molecule
+          "molecule-plugins[docker]"
+
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Run Molecule tests
+        run: molecule test --scenario-name default
+        working-directory: ${{ github.workspace }}
+
+  # ── Build collection tarball ───────────────────────────────────────────────
+  build:
+    name: Build Collection
+    runs-on: ubuntu-latest
+    needs: [syntax]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ansible-core
+        run: pip install ansible-core
+
+      - name: Build collection
+        run: ansible-galaxy collection build --output-path dist/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: collection-${{ github.sha }}
+          path: dist/*.tar.gz
+          retention-days: 7
