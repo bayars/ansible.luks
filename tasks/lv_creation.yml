@@ -4,11 +4,10 @@
     vg: "{{ disks.1.vg_group }}"
     lv: "{{ disks.1.lv_name }}"
     size: "{{ disks.1.size }}"
-    shrink: no
+    shrink: false
   no_log: false
 
-
-- name: Create LUKS disk
+- name: Create LUKS2 container on logical volume
   luks_device:
     device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
     state: present
@@ -16,13 +15,44 @@
     keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
     pbkdf:
       algorithm: pbkdf2
-      memory: 256
+      memory: 1048576
   no_log: false
 
-# - name: run clevis for encryption
-#   shell: |
-#     clevis luks bind -y -k /vault/{{ ansible_hostname }}/secrets/crypt-{{ item.lv_name }} -d {{ item.vg_path }}/{{ item.lv_name }} tpm2 '{"pcr_bank":"sha256","pcr_ids":"1,7"}'
-#   register: output
-#   changed_when: output.rc != 0
-#   no_log: false
-#   when: clevis is yes
+- name: Open LUKS container
+  luks_device:
+    device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+    state: opened
+    name: "luks-{{ disks.1.lv_name }}"
+    keyfile: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+  no_log: false
+
+- name: Create ext4 filesystem on LUKS container
+  filesystem:
+    fstype: ext4
+    dev: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+  no_log: false
+
+- name: Create mount point directory
+  file:
+    state: directory
+    path: "{{ disks.1.mount_point }}"
+    owner: root
+    group: root
+    mode: "0755"
+  no_log: false
+
+- name: Mount LUKS volume
+  mount:
+    path: "{{ disks.1.mount_point }}"
+    src: "/dev/mapper/luks-{{ disks.1.lv_name }}"
+    fstype: ext4
+    state: mounted
+  no_log: false
+
+- name: Add crypttab entry for auto-unlock
+  crypttab:
+    name: "luks-{{ disks.1.lv_name }}"
+    backing_device: "/dev/{{ disks.0.vg_name }}/{{ disks.1.lv_name }}"
+    password: "{{ disks.0.keys_path }}/{{ disks.1.lv_name }}"
+    state: present
+  no_log: false

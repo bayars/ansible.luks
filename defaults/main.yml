@@ -1,23 +1,10 @@
 ---
+# defaults file for luks
 
-
-
-# struct: {
-#   'diskname': '/dev/sda', 
-#   'partitionNumber': '1', 
-#   'specifications': {
-#       'VGName': 'ROOT',
-#       'VGPath': '/dev/ROOT',
-#       'VGSpecifications': {
-#         'lv_name': "root",
-#         'mount_point': "/root",
-#         'size': "5G"
-#       }
-#     }
-# }
+hide_logs: true
 
 lvm_packages:
-  - initramfs-tools 
+  - initramfs-tools
   - lvm2
   - rsync
   - cryptsetup
@@ -30,66 +17,5 @@ clevis_packages:
   - clevis-dracut
   - clevis-udisks2
 
-
-
-# struct: [{
-#   'diskname': '/dev/sda', 
-#   'partitionNumber': '1', 
-#   'specifications': {
-#       'VGName': 'ROOT',
-#       'VGPath': '/dev/ROOT',
-#       'VGSpecifications': [{
-#         'lv_name': "root",
-#         'mount_point': "/root",
-#         'size': "5G"
-#       },
-#       {
-#         'lv_name': "BACKUP",
-#         'mount_point': "/mnt",
-#         'size': "100G"
-#       }
-#       ]
-#     }
-#   },
-#   {
-#     'diskname': '/dev/sda', 
-#     'partitionNumber': '1', 
-#     'specifications': {
-#         'VGName': 'ROOT',
-#         'VGPath': '/dev/ROOT',
-#         'VGSpecifications': [{
-#           'lv_name': "root",
-#           'mount_point': "/root",
-#           'size': "5G"
-#         },
-#         {
-#           'lv_name': "BACKUP",
-#           'mount_point': "/mnt",
-#           'size': "100G"
-#         }
-#         ]
-#       }
-#   }]
-
-
-# disk_structure:
-#   - vg_name: "ROOT"
-#     partition_name:
-#     vg_path: "/dev/DATA"
-#     lv_name: "root"
-#     mount_point: "/root"
-#     size: "5G"
-  
-#   - vg_name: "DATA"
-#     vg_path: "/dev/DATA"
-#     lv_name: "backup"
-#     mount_point: "/mnt/backup"
-#     size: "100%FREE"
-
-
-#   - vg_name: "ubuntu-vg"
-#     vg_path: "/dev/ubuntu-vg"
-#     lv_name: "opt"
-#     mount_point: "/opt"
-#     size: "100%FREE"
-
+lvm_install: true
+clevis_install: false
