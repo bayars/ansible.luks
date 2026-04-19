@@ -1,0 +1,38 @@
+---
+- hosts: targets
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Assert key file present on target
+      ansible.builtin.stat:
+        path: /tmp/molecule-rf-keys/rflv
+      register: _local_key
+    - ansible.builtin.assert:
+        that:
+          - _local_key.stat.exists
+          - _local_key.stat.mode == '0400'
+        fail_msg: "Key file missing or wrong permissions on target"
+
+    - name: Assert LUKS container is open
+      ansible.builtin.stat:
+        path: /dev/mapper/luks-rflv
+      register: _mapper
+    - ansible.builtin.assert:
+        that: _mapper.stat.exists
+        fail_msg: "/dev/mapper/luks-rflv not present"
+
+    - name: Assert volume is mounted
+      ansible.builtin.command: mountpoint -q /mnt/rf-test
+      changed_when: false
+
+- hosts: keymanagers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Assert key file was synced to keymanager
+      ansible.builtin.stat:
+        path: /vault/keys/rflv
+      register: _remote_key
+    - ansible.builtin.assert:
+        that: _remote_key.stat.exists
+        fail_msg: "Key file was NOT synced to keymanager — remote_filesystem sync failed"

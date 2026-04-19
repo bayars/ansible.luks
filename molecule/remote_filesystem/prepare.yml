@@ -1,0 +1,87 @@
+---
+# Prepare the keymanager: install sshd, create key vault directory.
+- hosts: keymanagers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install openssh-server on keymanager
+      ansible.builtin.apt:
+        name: [openssh-server, rsync]
+        state: present
+        update_cache: true
+
+    - name: Ensure sshd is running
+      ansible.builtin.service:
+        name: ssh
+        state: started
+        enabled: true
+
+    - name: Create key vault directory on keymanager
+      ansible.builtin.file:
+        state: directory
+        path: /vault/keys
+        owner: root
+        group: root
+        mode: "0700"
+
+# Prepare the target: install packages, set up loop device, exchange SSH key.
+- hosts: targets
+  become: true
+  gather_facts: true
+  vars:
+    test_img: /tmp/molecule-rf-disk.img
+
+  tasks:
+    - name: Install required packages on target
+      ansible.builtin.apt:
+        name: [lvm2, cryptsetup, cryptsetup-bin, util-linux, parted, e2fsprogs, rsync, openssh-client]
+        state: present
+        update_cache: true
+
+    - name: Load dm-crypt kernel module
+      community.general.modprobe:
+        name: dm_crypt
+        state: present
+
+    - name: Create sparse image file
+      ansible.builtin.command:
+        cmd: truncate -s 2G {{ test_img }}
+        creates: "{{ test_img }}"
+
+    - name: Attach loop device
+      ansible.builtin.command: losetup --find --partscan --show {{ test_img }}
+      register: _loop
+      changed_when: true
+
+    - name: Persist loop device path
+      ansible.builtin.copy:
+        content: "{{ _loop.stdout | trim }}"
+        dest: /tmp/molecule-loop-device
+        mode: "0600"
+
+    - name: Generate SSH keypair for remote key sync
+      community.crypto.openssh_keypair:
+        path: /root/.ssh/keymanager_sync
+        type: ed25519
+        force: false
+      register: _keypair
+
+    - name: Read public key
+      ansible.builtin.slurp:
+        src: /root/.ssh/keymanager_sync.pub
+      register: _pubkey
+
+    - name: Store public key as fact
+      ansible.builtin.set_fact:
+        sync_pubkey: "{{ _pubkey.content | b64decode | trim }}"
+
+# Authorise the target's public key on the keymanager.
+- hosts: keymanagers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Authorise target SSH key on keymanager
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ hostvars[groups['targets'][0]]['sync_pubkey'] }}"
+        state: present

@@ -1,0 +1,43 @@
+---
+- hosts: targets
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Read loop device path
+      ansible.builtin.slurp:
+        src: /tmp/molecule-loop-device
+      register: _loop_raw
+
+    - name: Set loop and keymanager facts
+      ansible.builtin.set_fact:
+        test_loop: "{{ _loop_raw.content | b64decode | trim }}"
+        keymanager_ip: "{{ hostvars[groups['keymanagers'][0]]['ansible_default_ipv4']['address'] }}"
+
+  vars:
+    luks_action: encrypt
+    hide_logs: false
+    lvm_install: false
+    clevis_install: false
+    spec:
+      - disk_name: "{{ test_loop }}"
+        pv_number: '1'
+        vg_name: 'RFVG'
+        vg_path: "{{ test_loop }}p1"
+        keys_path: "/tmp/molecule-rf-keys"
+        lv_specifications:
+          - lv_name: "rflv"
+            mount_point: "/mnt/rf-test"
+            size: "512M"
+            vg_group: "RFVG"
+            fstype: "ext4"
+        key_storage:
+          type: remote_filesystem
+          remote_host: "{{ keymanager_ip }}"
+          remote_user: "root"
+          remote_path: "/vault/keys"
+          remote_port: "22"
+          remote_key: "/root/.ssh/keymanager_sync"
+
+  roles:
+    - role: bayars.luks
