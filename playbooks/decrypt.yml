@@ -1,0 +1,30 @@
+---
+# Unlock and mount LUKS volumes on target hosts.
+# Use this after a reboot or when volumes need to be manually opened.
+# Key files must be present locally at keys_path on the target host.
+#
+# Usage:
+#   ansible-playbook playbooks/decrypt.yml -i inventory/hosts
+
+- hosts: all
+  become: true
+  vars:
+    luks_action: decrypt
+    hide_logs: true
+    # spec must match exactly what was used during encrypt
+    spec:
+      - disk_name: '/dev/sdb'
+        pv_number: '1'
+        vg_name: 'DATA'
+        vg_path: '/dev/sdb1'
+        keys_path: "/var/lib/luks-keys/{{ ansible_hostname }}"
+        lv_specifications:
+          - lv_name: "data"
+            mount_point: "/data"
+            size: "100%FREE"
+            vg_group: "DATA"
+            fstype: "ext4"
+        key_storage:
+          type: filesystem
+  roles:
+    - role: safabayar.luks

@@ -1,0 +1,36 @@
+---
+# Provision LUKS2-encrypted LVM volumes on target hosts.
+# Override spec and key_storage in group_vars or with -e @vars.yml.
+#
+# Usage:
+#   ansible-playbook playbooks/encrypt.yml -i inventory/hosts
+#   ansible-playbook playbooks/encrypt.yml -i inventory/hosts -e hide_logs=false
+
+- hosts: all
+  become: true
+  vars:
+    luks_action: encrypt
+    hide_logs: true
+    # Override spec here or supply via group_vars / host_vars / -e @vars.yml
+    spec:
+      - disk_name: '/dev/sdb'
+        pv_number: '1'
+        vg_name: 'DATA'
+        vg_path: '/dev/sdb1'
+        keys_path: "/var/lib/luks-keys/{{ ansible_hostname }}"
+        lv_specifications:
+          - lv_name: "data"
+            mount_point: "/data"
+            size: "100%FREE"
+            vg_group: "DATA"
+            fstype: "ext4"
+        key_storage:
+          type: filesystem
+          # type: remote_filesystem  (also set remote_* fields below)
+          remote_host: "192.168.1.1"
+          remote_user: "root"
+          remote_path: "/vault/{{ ansible_hostname }}/secrets"
+          remote_port: "22"
+          remote_key: "/root/.ssh/key_manager_rsa"
+  roles:
+    - role: safabayar.luks
