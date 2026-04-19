@@ -1,0 +1,47 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+# MOLECULE_DISTRO is set by the CI matrix. Locally it defaults to ubuntu2204.
+# Privileged mode + /dev bind-mount gives the container access to loop
+# devices so cryptsetup / LVM can run real operations.
+platforms:
+  - name: "luks-test-${MOLECULE_DISTRO:-ubuntu2204}"
+    image: "geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2204}-ansible:latest"
+    pre_build_image: true
+    privileged: true
+    command: ""
+    volumes:
+      - /dev:/dev
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    tmpfs:
+      - /run
+      - /tmp
+
+provisioner:
+  name: ansible
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+  config_options:
+    defaults:
+      callbacks_enabled: profile_tasks
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+
+verifier:
+  name: ansible
+
+lint: |
+  set -e
+  yamllint -c ../../.yamllint.yml .
+  ansible-lint converge.yml verify.yml

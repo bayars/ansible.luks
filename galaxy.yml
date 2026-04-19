@@ -1,0 +1,34 @@
+namespace: safabayar
+name: luks
+version: 1.0.0
+readme: README.md
+authors:
+  - Safa Bayar <bayarsafa@gmail.com>
+description: >-
+  Provision and manage LUKS2-encrypted LVM logical volumes.
+  Supports Debian/Ubuntu and RHEL/Rocky/CentOS.
+  Configurable key storage backends (local filesystem, remote filesystem).
+  Includes encrypt and decrypt playbooks.
+license:
+  - MIT
+tags:
+  - luks
+  - lvm
+  - encryption
+  - storage
+  - security
+  - linux
+  - cryptsetup
+repository: https://github.com/safabayar/ansible.luks
+documentation: https://github.com/safabayar/ansible.luks
+homepage: https://github.com/safabayar/ansible.luks
+issues: https://github.com/safabayar/ansible.luks/issues
+build_ignore:
+  - .github/
+  - .yamllint.yml
+  - .ansible-lint
+  - molecule/
+  - tests/
+  - ansible.cfg
+  - hosts
+dependencies: {}

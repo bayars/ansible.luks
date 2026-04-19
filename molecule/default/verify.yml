@@ -1,0 +1,63 @@
+---
+# Verifies that the encrypt action produced the expected state.
+
+- hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Read loop device path
+      ansible.builtin.slurp:
+        src: /tmp/molecule-loop-device
+      register: _loop_raw
+
+    - name: Set loop device fact
+      ansible.builtin.set_fact:
+        test_loop: "{{ _loop_raw.content | b64decode | trim }}"
+
+    - name: LUKS key file exists
+      ansible.builtin.stat:
+        path: /tmp/molecule-luks-keys/testlv
+      register: _key
+    - name: Assert key file present and mode 0400
+      ansible.builtin.assert:
+        that:
+          - _key.stat.exists
+          - _key.stat.mode == '0400'
+        fail_msg: "Key file missing or wrong permissions"
+
+    - name: LUKS container is open (mapper device exists)
+      ansible.builtin.stat:
+        path: /dev/mapper/luks-testlv
+      register: _mapper
+    - name: Assert mapper device is present
+      ansible.builtin.assert:
+        that: _mapper.stat.exists
+        fail_msg: "/dev/mapper/luks-testlv not found — LUKS container not open"
+
+    - name: Volume group MOLECULE exists
+      ansible.builtin.command: vgdisplay MOLECULE
+      register: _vg
+      changed_when: false
+    - name: Assert VG exists
+      ansible.builtin.assert:
+        that: _vg.rc == 0
+        fail_msg: "Volume group MOLECULE not found"
+
+    - name: /mnt/molecule-test is mounted
+      ansible.builtin.command: mountpoint -q /mnt/molecule-test
+      register: _mount
+      changed_when: false
+    - name: Assert mount point is active
+      ansible.builtin.assert:
+        that: _mount.rc == 0
+        fail_msg: "/mnt/molecule-test is not mounted"
+
+    - name: crypttab entry for luks-testlv exists
+      ansible.builtin.command: grep -q "luks-testlv" /etc/crypttab
+      register: _crypttab
+      changed_when: false
+    - name: Assert crypttab entry present
+      ansible.builtin.assert:
+        that: _crypttab.rc == 0
+        fail_msg: "crypttab entry for luks-testlv missing"

@@ -1,0 +1,39 @@
+---
+# Runs the encrypt action against the loop device created in prepare.yml.
+
+- hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Read loop device path from prepare
+      ansible.builtin.slurp:
+        src: /tmp/molecule-loop-device
+      register: _loop_raw
+
+    - name: Set loop device fact
+      ansible.builtin.set_fact:
+        test_loop: "{{ _loop_raw.content | b64decode | trim }}"
+
+  vars:
+    luks_action: encrypt
+    hide_logs: false
+    lvm_install: false     # packages installed in prepare.yml
+    clevis_install: false
+    spec:
+      - disk_name: "{{ test_loop }}"
+        pv_number: '1'
+        vg_name: 'MOLECULE'
+        vg_path: "{{ test_loop }}p1"
+        keys_path: "/tmp/molecule-luks-keys"
+        lv_specifications:
+          - lv_name: "testlv"
+            mount_point: "/mnt/molecule-test"
+            size: "512M"
+            vg_group: "MOLECULE"
+            fstype: "ext4"
+        key_storage:
+          type: filesystem
+
+  roles:
+    - role: safabayar.luks

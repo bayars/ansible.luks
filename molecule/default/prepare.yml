@@ -1,0 +1,58 @@
+---
+# Sets up a sparse file + loop device used as the test "disk".
+# This avoids needing a real block device while still exercising
+# parted, LVM, cryptsetup, and mount inside a privileged container.
+
+- hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    test_img: /tmp/molecule-test-disk.img
+    test_img_size: 2G
+    test_loop_state_file: /tmp/molecule-loop-device
+
+  tasks:
+    - name: Install required packages (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - lvm2
+          - cryptsetup
+          - cryptsetup-bin
+          - util-linux
+          - parted
+          - e2fsprogs
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Install required packages (RHEL/Rocky/CentOS)
+      ansible.builtin.dnf:
+        name:
+          - lvm2
+          - cryptsetup
+          - util-linux
+          - parted
+          - e2fsprogs
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Load dm-crypt kernel module
+      community.general.modprobe:
+        name: dm_crypt
+        state: present
+
+    - name: Create sparse image file ({{ test_img_size }})
+      ansible.builtin.command:
+        cmd: truncate -s {{ test_img_size }} {{ test_img }}
+        creates: "{{ test_img }}"
+
+    - name: Attach loop device
+      ansible.builtin.command: losetup --find --partscan --show {{ test_img }}
+      register: _loop
+      changed_when: true
+
+    - name: Persist loop device path for converge / verify
+      ansible.builtin.copy:
+        content: "{{ _loop.stdout | trim }}"
+        dest: "{{ test_loop_state_file }}"
+        mode: "0600"
